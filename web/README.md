@@ -27,11 +27,19 @@ Dev server proxies `/api`, `/health`, `/ping`, and `/query` to the API.
 
 ### Keyboard shortcuts
 
+Press `?` in the workspace or open **Settings** in the sidebar for the full guide and shortcut list. Common shortcuts:
+
 | Shortcut | Action |
 |----------|--------|
 | ⌘↵ / Ctrl+Enter | Run query |
-| ⌘E / Ctrl+E | Toggle environment |
-| Escape | Close env menu |
+| ⌘S / Ctrl+S | Save script |
+| ⌘N / Ctrl+N | New script tab |
+| ⌘W / Ctrl+W | Close active tab |
+| ⌘H / Ctrl+H | Query history |
+| ⌘E / Ctrl+E | Cycle database connection |
+| ⌘B / Ctrl+B | Toggle sidebar |
+| ⌘1–9 / Ctrl+1–9 | Switch to tab N |
+| ⌘/ / Ctrl+/ | Toggle SQL line comment (in editor) |
 
 Set `VITE_API_BASE_URL` when calling the API without the proxy.
 

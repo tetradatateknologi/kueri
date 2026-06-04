@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Play, X, Plus, Download, Save, Clock, Loader2 } from "lucide-react";
 
 import { ExportModal } from "@/components/kueri/ExportModal";
@@ -20,8 +20,11 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { useAppView } from "@/context/app-view";
 import { useKueriApp } from "@/context/kueri-app";
-import { useWorkspaceHotkeys } from "@/hooks/use-workspace-hotkeys";
+import { useSelectConnection } from "@/context/select-connection";
+import { useKueriHotkeys } from "@/hooks/use-kueri-hotkeys";
+import { formatShortcut } from "@/lib/hotkeys";
 import { ApiError } from "@/lib/api/http";
 import { useExecuteQuery } from "@/lib/api/queries";
 import { saveScript } from "@/lib/saved-scripts";
@@ -42,6 +45,7 @@ const envMeta: Record<WorkspaceEnv, { dot: string; ring: string }> = {
 
 export function Workspace() {
   const {
+    workspaces,
     scripts,
     openScriptIds,
     activeScriptId,
@@ -69,8 +73,11 @@ export function Workspace() {
 
   const executeMutation = useExecuteQuery();
 
+  const { selectConnection } = useSelectConnection();
+
   const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const { openSettings } = useAppView();
 
   const openTabs = openScriptIds
     .map((id) => scripts.find((s) => s.id === id))
@@ -136,9 +143,27 @@ export function Workspace() {
     hasOpenTab,
   ]);
 
-  useWorkspaceHotkeys({ onRun: runQuery });
+  const cycleConnection = useCallback(() => {
+    if (!selectedConnection) return;
+    const ws = workspaces.find((w) => String(w.id) === selectedConnection.projectId);
+    if (!ws?.connections.length) return;
+    const idx = ws.connections.findIndex((c) => c.id === selectedConnection.connectionId);
+    const next = ws.connections[(idx + 1) % ws.connections.length];
+    selectConnection({
+      connectionId: next.id,
+      projectId: String(ws.id),
+      projectName: ws.name,
+      env: next.env_key,
+      label: next.name,
+      host: next.display_host,
+    });
+  }, [workspaces, selectedConnection, selectConnection]);
 
-  const handleSave = async () => {
+  const focusSidebarSearch = useCallback(() => {
+    document.getElementById("kueri-sidebar-search")?.focus();
+  }, []);
+
+  const handleSave = useCallback(async () => {
     if (!hasOpenTab) return;
     if (activeScriptId == null) {
       saveScript({ title: activeTitle, sql: draftSql });
@@ -151,7 +176,62 @@ export function Workspace() {
     } catch (err) {
       showQueryErrorToast(err instanceof Error ? err.message : "Save failed", "Save failed");
     }
-  };
+  }, [hasOpenTab, activeScriptId, activeTitle, draftSql, saveActiveScript]);
+
+  const hotkeyHandlers = useMemo(
+    () => ({
+      onRun: runQuery,
+      onSave: () => void handleSave(),
+      onNewTab: () => void createNewScript(),
+      onCloseTab: () => {
+        if (activeScriptId != null) closeScript(activeScriptId);
+      },
+      onEditScript: () => {
+        if (activeScriptId != null) openEditScript(activeScriptId);
+      },
+      onHistory: () => setHistoryOpen(true),
+      onExport: () => {
+        if (lastResult) setExportOpen(true);
+      },
+      onFocusSidebarSearch: focusSidebarSearch,
+      onCycleConnection: cycleConnection,
+      onNextTab: () => {
+        if (!openScriptIds.length || activeScriptId == null) return;
+        const i = openScriptIds.indexOf(activeScriptId);
+        const nextId = openScriptIds[(i + 1) % openScriptIds.length];
+        setActiveScriptId(nextId);
+      },
+      onPrevTab: () => {
+        if (!openScriptIds.length || activeScriptId == null) return;
+        const i = openScriptIds.indexOf(activeScriptId);
+        const prevId = openScriptIds[(i - 1 + openScriptIds.length) % openScriptIds.length];
+        setActiveScriptId(prevId);
+      },
+      onSwitchTab: (index: number) => {
+        const id = openScriptIds[index];
+        if (id != null) setActiveScriptId(id);
+      },
+      onResultsView: (view: "results" | "json") => setResultsView(view),
+      onShowShortcuts: () => openSettings("shortcuts"),
+    }),
+    [
+      runQuery,
+      activeScriptId,
+      closeScript,
+      createNewScript,
+      openEditScript,
+      openScriptIds,
+      setActiveScriptId,
+      lastResult,
+      focusSidebarSearch,
+      cycleConnection,
+      setResultsView,
+      handleSave,
+      openSettings,
+    ],
+  );
+
+  useKueriHotkeys(hotkeyHandlers);
 
   const metaLabel =
     lastResult != null
@@ -277,6 +357,7 @@ export function Workspace() {
           >
             {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
             Save
+            <span className="text-[10px] opacity-60 font-mono">{formatShortcut("S")}</span>
           </button>
           <button
             type="button"
@@ -284,6 +365,7 @@ export function Workspace() {
             className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors"
           >
             <Clock className="size-3.5" /> History
+            <span className="text-[10px] opacity-60 font-mono">{formatShortcut("H")}</span>
           </button>
 
           <div className="ml-auto flex items-center gap-2">
@@ -304,7 +386,16 @@ export function Workspace() {
                 <Play className="size-3.5 fill-current" />
               )}
               Run Query
-              <span className="text-[10px] opacity-70 font-mono pl-1">⌘↵</span>
+              <span className="text-[10px] opacity-70 font-mono pl-1">{formatShortcut("Enter")}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => openSettings("shortcuts")}
+              className="size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-1 text-xs font-mono"
+              aria-label="Settings and keyboard shortcuts"
+              title="Settings (?) — panduan & pintasan"
+            >
+              ?
             </button>
           </div>
         </div>
@@ -312,7 +403,7 @@ export function Workspace() {
         <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0" id="kueri-editor-results">
           <ResizablePanel defaultSize={50} minSize={20}>
             {hasOpenTab ? (
-              <EditorPane value={draftSql} onChange={setDraftSql} />
+              <EditorPane value={draftSql} onChange={setDraftSql} onRun={runQuery} />
             ) : (
               <EditorEmptyState onCreateScript={() => void createNewScript()} />
             )}

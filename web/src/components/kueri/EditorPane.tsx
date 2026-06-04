@@ -6,14 +6,15 @@ import { WorkspaceEmptyState } from "@/components/kueri/WorkspaceEmptyState";
 type EditorPaneProps = {
   value: string;
   onChange: (value: string) => void;
+  onRun?: () => void;
 };
 
-export function EditorPane({ value, onChange }: EditorPaneProps) {
+export function EditorPane({ value, onChange, onRun }: EditorPaneProps) {
   const isDocumentEmpty = value.trim() === "";
 
   return (
     <div className="relative h-full min-h-0">
-      <SqlEditor value={value} onChange={onChange} />
+      <SqlEditor value={value} onChange={onChange} onRun={onRun} />
       {isDocumentEmpty && (
         <WorkspaceEmptyState
           aria-hidden

@@ -5,6 +5,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
@@ -50,7 +51,8 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const [openScriptIds, setOpenScriptIds] = useState<number[]>([]);
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
-  const [draftSql, setDraftSql] = useState("");
+  const [draftSql, setDraftSqlState] = useState("");
+  const draftByScriptIdRef = useRef<Record<number, string>>({});
   const [editScriptTarget, setEditScriptTarget] = useState<EditScriptTarget | null>(null);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe });
@@ -63,11 +65,55 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     enabled: activeScriptId != null,
   });
 
+  const persistDraftForScript = useCallback((scriptId: number, sql: string) => {
+    draftByScriptIdRef.current[scriptId] = sql;
+  }, []);
+
+  const setDraftSql = useCallback(
+    (sql: string) => {
+      setDraftSqlState(sql);
+      if (activeScriptId != null) {
+        persistDraftForScript(activeScriptId, sql);
+      }
+    },
+    [activeScriptId, persistDraftForScript],
+  );
+
+  const loadDraftForScript = useCallback(
+    (scriptId: number) => {
+      const cached = draftByScriptIdRef.current[scriptId];
+      if (cached !== undefined) {
+        setDraftSqlState(cached);
+        return;
+      }
+      const fromList = scriptsQuery.data?.find((s) => s.id === scriptId);
+      if (fromList) {
+        setDraftSqlState(fromList.sql_text);
+        return;
+      }
+      setDraftSqlState("");
+    },
+    [scriptsQuery.data],
+  );
+
   useEffect(() => {
-    if (activeScriptQuery.data) {
-      setDraftSql(activeScriptQuery.data.sql_text);
+    if (activeScriptId == null) return;
+    if (draftByScriptIdRef.current[activeScriptId] !== undefined) return;
+    if (activeScriptQuery.data?.id === activeScriptId) {
+      setDraftSqlState(activeScriptQuery.data.sql_text);
     }
-  }, [activeScriptQuery.data]);
+  }, [activeScriptId, activeScriptQuery.data]);
+
+  const switchActiveScript = useCallback(
+    (id: number) => {
+      if (activeScriptId != null) {
+        persistDraftForScript(activeScriptId, draftSql);
+      }
+      setActiveScriptId(id);
+      loadDraftForScript(id);
+    },
+    [activeScriptId, draftSql, loadDraftForScript, persistDraftForScript],
+  );
 
   useEffect(() => {
     const scripts = scriptsQuery.data;
@@ -75,12 +121,14 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     const firstId = scripts[0].id;
     setOpenScriptIds([firstId]);
     setActiveScriptId(firstId);
-  }, [scriptsQuery.data, openScriptIds.length]);
+    loadDraftForScript(firstId);
+  }, [scriptsQuery.data, openScriptIds.length, loadDraftForScript]);
 
   const saveMutation = useMutation({
     mutationFn: () => updateScript(activeScriptId!, { sql_text: draftSql }),
     onSuccess: (script) => {
       queryClient.setQueryData(["script", script.id], script);
+      persistDraftForScript(script.id, script.sql_text);
       void queryClient.invalidateQueries({ queryKey: ["scripts"] });
     },
   });
@@ -118,25 +166,32 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     [scripts, activeScriptQuery.data],
   );
 
-  const openScript = useCallback((id: number) => {
-    setOpenScriptIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-    setActiveScriptId(id);
-  }, []);
+  const openScript = useCallback(
+    (id: number) => {
+      setOpenScriptIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
+      switchActiveScript(id);
+    },
+    [switchActiveScript],
+  );
 
   const closeScript = useCallback(
     (id: number) => {
+      delete draftByScriptIdRef.current[id];
       setOpenScriptIds((prev) => {
         const next = prev.filter((x) => x !== id);
         if (activeScriptId === id) {
-          setActiveScriptId(next[0] ?? null);
-        }
-        if (next.length === 0) {
-          setDraftSql("");
+          const nextActive = next[0] ?? null;
+          setActiveScriptId(nextActive);
+          if (nextActive != null) {
+            loadDraftForScript(nextActive);
+          } else {
+            setDraftSqlState("");
+          }
         }
         return next;
       });
     },
-    [activeScriptId],
+    [activeScriptId, loadDraftForScript],
   );
 
   const refetchAll = useCallback(() => {
@@ -169,8 +224,8 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         });
         await queryClient.invalidateQueries({ queryKey: ["scripts"] });
         queryClient.setQueryData(["script", script.id], script);
+        draftByScriptIdRef.current[script.id] = script.sql_text;
         openScript(script.id);
-        setDraftSql(script.sql_text);
       } catch (err) {
         const message =
           err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to create script";
@@ -197,7 +252,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       setDraftSql,
       openScript,
       closeScript,
-      setActiveScriptId,
+      setActiveScriptId: switchActiveScript,
       saveActiveScript: async () => {
         if (activeScriptId == null) return;
         await saveMutation.mutateAsync();
@@ -219,6 +274,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       draftSql,
       openScript,
       closeScript,
+      switchActiveScript,
       saveMutation,
       refetchAll,
       createNewScript,

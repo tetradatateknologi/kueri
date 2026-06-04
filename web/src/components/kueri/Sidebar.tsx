@@ -1,21 +1,31 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Database, FolderGit2, FileCode2, Plus, Search } from "lucide-react";
+import {
+  ChevronRight,
+  Database,
+  FileCode2,
+  FolderGit2,
+  Plus,
+  Search,
+  Settings,
+} from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/kueri/ConfirmDeleteDialog";
 import { CreateConnectionDialog } from "@/components/kueri/CreateConnectionDialog";
 import { CreateWorkspaceDialog } from "@/components/kueri/CreateWorkspaceDialog";
-import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
 import { RenameDialog } from "@/components/kueri/RenameDialog";
 import { SidebarItemMenu } from "@/components/kueri/SidebarItemMenu";
 import { SidebarSectionSkeleton } from "@/components/kueri/SidebarSectionSkeleton";
 import {
   Sidebar as UiSidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { useAppView } from "@/context/app-view";
 import { useKueriApp } from "@/context/kueri-app";
+import { useSelectConnection } from "@/context/select-connection";
 import { ApiError } from "@/lib/api/http";
 import { deleteScript } from "@/lib/api/scripts";
 import type { Script } from "@/lib/api/types";
@@ -79,8 +89,8 @@ export function Sidebar() {
   } | null>(null);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
-  const [prodDialogOpen, setProdDialogOpen] = useState(false);
-  const pendingConnection = useRef<SelectedConnection | null>(null);
+  const { selectConnection } = useSelectConnection();
+  const { view, openWorkspace, openSettings } = useAppView();
 
   const handleMutationError = (err: unknown) => {
     const message =
@@ -191,7 +201,7 @@ export function Sidebar() {
     const conn = ws.connections[0];
     if (!conn) return;
 
-    setSelectedConnection({
+    selectConnection({
       connectionId: conn.id,
       projectId: String(ws.id),
       projectName: ws.name,
@@ -199,16 +209,7 @@ export function Sidebar() {
       label: conn.name,
       host: conn.display_host,
     });
-  }, [hasHydrated, isLoading, workspaces, selectedConnection?.connectionId, setSelectedConnection]);
-
-  const applyConnection = (selected: SelectedConnection) => {
-    if (selected.env === "prod") {
-      pendingConnection.current = selected;
-      setProdDialogOpen(true);
-      return;
-    }
-    setSelectedConnection(selected);
-  };
+  }, [hasHydrated, isLoading, workspaces, selectedConnection?.connectionId, selectConnection]);
 
   const pickConnection = (
     workspace: (typeof workspaces)[0],
@@ -222,7 +223,7 @@ export function Sidebar() {
       label: conn.name,
       host: conn.display_host,
     };
-    applyConnection(selected);
+    selectConnection(selected);
   };
 
   const isConnActive = (
@@ -249,6 +250,7 @@ export function Sidebar() {
           <div className="relative">
             <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
+              id="kueri-sidebar-search"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search…"
@@ -419,6 +421,45 @@ export function Sidebar() {
             </>
           )}
         </SidebarContent>
+
+        <SidebarFooter className="border-t border-sidebar-border p-2 gap-1">
+          <button
+            type="button"
+            onClick={openWorkspace}
+            className={cn(
+              "w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-colors",
+              view === "workspace"
+                ? "bg-surface-1 text-foreground ring-1 ring-electric/30"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-1/60",
+            )}
+          >
+            <FileCode2 className="size-3.5 shrink-0" />
+            <span className="flex-1 text-left">Editor</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => openSettings("guide")}
+            className={cn(
+              "w-full flex items-center gap-2 px-3 py-2 rounded-md text-xs transition-colors",
+              view === "settings"
+                ? "bg-surface-1 text-foreground ring-1 ring-electric/30"
+                : "text-muted-foreground hover:text-foreground hover:bg-surface-1/60",
+            )}
+          >
+            <Settings className="size-3.5 shrink-0" />
+            <span className="flex-1 text-left">Settings</span>
+            <span className="text-[10px] font-mono opacity-60">?</span>
+          </button>
+          {view === "settings" && (
+            <button
+              type="button"
+              onClick={() => openSettings("shortcuts")}
+              className="w-full flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface-1/60 transition-colors"
+            >
+              Pintasan keyboard
+            </button>
+          )}
+        </SidebarFooter>
       </UiSidebar>
 
       <CreateWorkspaceDialog open={workspaceDialogOpen} onOpenChange={setWorkspaceDialogOpen} />
@@ -435,18 +476,6 @@ export function Sidebar() {
           }
         />
       )}
-      <ProductionEnvDialog
-        open={prodDialogOpen}
-        onOpenChange={setProdDialogOpen}
-        onConfirm={() => {
-          if (pendingConnection.current) {
-            setSelectedConnection(pendingConnection.current);
-            pendingConnection.current = null;
-          }
-          setProdDialogOpen(false);
-        }}
-      />
-
       {renameTarget && (
         <RenameDialog
           open

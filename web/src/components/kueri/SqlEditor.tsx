@@ -1,8 +1,13 @@
 import { sql } from "@codemirror/lang-sql";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  history,
+  historyKeymap,
+  toggleComment,
+} from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
 import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorState } from "@codemirror/state";
+import { EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 
@@ -11,15 +16,18 @@ import { cn } from "@/lib/utils";
 type SqlEditorProps = {
   value: string;
   onChange: (value: string) => void;
+  onRun?: () => void;
   readOnly?: boolean;
   className?: string;
 };
 
-export function SqlEditor({ value, onChange, readOnly = false, className }: SqlEditorProps) {
+export function SqlEditor({ value, onChange, onRun, readOnly = false, className }: SqlEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
+  const onRunRef = useRef(onRun);
+  onRunRef.current = onRun;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -30,6 +38,20 @@ export function SqlEditor({ value, onChange, readOnly = false, className }: SqlE
       }
     });
 
+    const runKeymap = keymap.of([
+      {
+        key: "Mod-Enter",
+        run: () => {
+          onRunRef.current?.();
+          return true;
+        },
+      },
+      {
+        key: "Mod-/",
+        run: toggleComment,
+      },
+    ]);
+
     const state = EditorState.create({
       doc: value,
       extensions: [
@@ -38,6 +60,7 @@ export function SqlEditor({ value, onChange, readOnly = false, className }: SqlE
         sql(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         oneDark,
+        Prec.high(runKeymap),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorState.readOnly.of(readOnly),
