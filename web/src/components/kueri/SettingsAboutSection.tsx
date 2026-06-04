@@ -1,6 +1,7 @@
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { Download, ExternalLink, RefreshCw } from "lucide-react";
 
+import { KueriLogo } from "@/components/kueri/KueriLogo";
 import { checkForUpdates } from "@/lib/api/updates";
 import { fetchVersion } from "@/lib/api/version";
 import { appVersion, isDesktopBuild } from "@/lib/app-meta";
@@ -30,11 +31,14 @@ export function SettingsAboutSection() {
 
   return (
     <div className="space-y-8 max-w-2xl">
-      <div>
-        <h2 className="text-lg font-semibold">Tentang Kueri</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Informasi versi aplikasi dan pembaruan desktop.
-        </p>
+      <div className="flex items-start gap-4">
+        <KueriLogo size="md" showWordmark={false} />
+        <div>
+          <h2 className="text-lg font-semibold">Tentang Kueri</h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Informasi versi aplikasi dan pembaruan desktop.
+          </p>
+        </div>
       </div>
 
       <section className="rounded-lg border border-border bg-surface-1/30 p-4 space-y-3">

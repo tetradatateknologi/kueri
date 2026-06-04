@@ -1,6 +1,7 @@
 import type { CSSProperties } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiStatus } from "@/components/ApiStatus";
+import { DesktopWelcomeGate } from "@/components/kueri/DesktopWelcomeGate";
 import { SettingsView } from "@/components/kueri/SettingsView";
 import { Sidebar } from "@/components/kueri/Sidebar";
 import { Workspace } from "@/components/kueri/Workspace";
@@ -27,6 +28,7 @@ export default function App() {
       <KueriAppProvider>
         <AppViewProvider>
         <SelectConnectionProvider>
+          <DesktopWelcomeGate>
           <SidebarProvider
             className="dark !min-h-0 h-screen w-screen overflow-hidden bg-background text-foreground"
             style={{ "--sidebar-width": "18rem" } as CSSProperties}
@@ -38,6 +40,7 @@ export default function App() {
             </SidebarInset>
           </SidebarProvider>
           <Toaster />
+          </DesktopWelcomeGate>
         </SelectConnectionProvider>
         </AppViewProvider>
       </KueriAppProvider>

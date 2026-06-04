@@ -2,7 +2,6 @@ import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
-  Database,
   FileCode2,
   FolderGit2,
   Plus,
@@ -12,6 +11,7 @@ import {
 
 import { ConfirmDeleteDialog } from "@/components/kueri/ConfirmDeleteDialog";
 import { FavoritesSection } from "@/components/kueri/FavoritesSection";
+import { KueriLogo } from "@/components/kueri/KueriLogo";
 import { ScriptFavoriteButton } from "@/components/kueri/ScriptFavoriteButton";
 import { CreateConnectionDialog } from "@/components/kueri/CreateConnectionDialog";
 import { CreateWorkspaceDialog } from "@/components/kueri/CreateWorkspaceDialog";
@@ -266,12 +266,7 @@ export function Sidebar() {
       <UiSidebar collapsible="offcanvas" className="border-sidebar-border">
         <SidebarRail />
         <SidebarHeader className="h-12 flex-row items-center gap-2 border-b border-sidebar-border px-3 py-0">
-          <div className="size-6 rounded-md bg-gradient-to-br from-electric to-neon flex items-center justify-center shrink-0">
-            <Database className="size-3.5 text-background" />
-          </div>
-          <span className="font-mono text-sm tracking-tight truncate">
-            kueri<span className="text-electric">.dev</span>
-          </span>
+          <KueriLogo size="sm" />
         </SidebarHeader>
 
         <div className="px-3 pt-3 shrink-0">
