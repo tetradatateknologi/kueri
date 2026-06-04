@@ -90,3 +90,20 @@ Generate manifest locally:
 ```bash
 make release-manifest ARTIFACT_DIR=dist/release
 ```
+
+---
+
+## Backup & restore (pindah perangkat)
+
+Settings → **Cadangan data** → ekspor/impor file JSON.
+
+| Isi cadangan | Lokasi |
+|--------------|--------|
+| Workspaces, koneksi, skrip, tag, favorit | Database (API `/api/v1/backup/*`) |
+| Riwayat query, preferensi UI | Browser localStorage (digabung saat ekspor) |
+
+**Mode impor:**
+- **Merge** — tambah data baru, lewati duplikat
+- **Replace** — hapus semua data lokal lalu ganti dari cadangan
+
+File: `kueri-backup-YYYY-MM-DD.json` (format `kueri-backup` v1). Password koneksi disertakan — simpan file di tempat aman.

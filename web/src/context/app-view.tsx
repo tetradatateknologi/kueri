@@ -9,7 +9,7 @@ import {
 
 export type AppView = "workspace" | "settings";
 
-export type SettingsSection = "guide" | "shortcuts" | "contribute" | "about";
+export type SettingsSection = "guide" | "shortcuts" | "backup" | "about" | "contribute";
 
 type AppViewContextValue = {
   view: AppView;
