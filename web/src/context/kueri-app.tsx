@@ -27,6 +27,8 @@ import {
   toScriptTitle,
 } from "@/lib/script-title";
 import { listWorkspaces } from "@/lib/api/workspaces";
+import { useAppUrl } from "@/context/app-url";
+import { readAppUrlFromLocation } from "@/lib/app-url";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 type EditScriptTarget = { id: number; title: string; tags: string[] };
@@ -61,6 +63,7 @@ const KueriAppContext = createContext<KueriAppContextValue | null>(null);
 
 export function KueriAppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const { setActiveScriptId: setUrlScriptId } = useAppUrl();
   const [openScriptIds, setOpenScriptIds] = useState<number[]>([]);
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
   const [draftSql, setDraftSqlState] = useState("");
@@ -123,19 +126,22 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         persistDraftForScript(activeScriptId, draftSql);
       }
       setActiveScriptId(id);
+      setUrlScriptId(id);
       loadDraftForScript(id);
     },
-    [activeScriptId, draftSql, loadDraftForScript, persistDraftForScript],
+    [activeScriptId, draftSql, loadDraftForScript, persistDraftForScript, setUrlScriptId],
   );
 
   useEffect(() => {
     const scripts = scriptsQuery.data;
     if (!scripts?.length || openScriptIds.length > 0) return;
+    if (readAppUrlFromLocation().scriptId != null) return;
     const firstId = scripts[0].id;
     setOpenScriptIds([firstId]);
     setActiveScriptId(firstId);
+    setUrlScriptId(firstId);
     loadDraftForScript(firstId);
-  }, [scriptsQuery.data, openScriptIds.length, loadDraftForScript]);
+  }, [scriptsQuery.data, openScriptIds.length, loadDraftForScript, setUrlScriptId]);
 
   const saveMutation = useMutation({
     mutationFn: () => updateScript(activeScriptId!, { sql_text: draftSql }),
@@ -272,6 +278,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         if (activeScriptId === id) {
           const nextActive = next[0] ?? null;
           setActiveScriptId(nextActive);
+          setUrlScriptId(nextActive);
           if (nextActive != null) {
             loadDraftForScript(nextActive);
           } else {
@@ -281,7 +288,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         return next;
       });
     },
-    [activeScriptId, loadDraftForScript],
+    [activeScriptId, loadDraftForScript, setUrlScriptId],
   );
 
   const refetchAll = useCallback(() => {

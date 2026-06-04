@@ -20,6 +20,8 @@ import type { Workspace } from "@/lib/api/types";
 
 type AppUrlContextValue = {
   snapshot: AppUrlSnapshot;
+  /** Increments on browser back/forward (popstate). */
+  historyEpoch: number;
   setProjectFilter: (workspace: Workspace | null) => void;
   setActiveScriptId: (id: number | null) => void;
   setActiveConnectionId: (id: number | null) => void;
@@ -31,9 +33,13 @@ const AppUrlContext = createContext<AppUrlContextValue | null>(null);
 
 export function AppUrlProvider({ children }: { children: ReactNode }) {
   const [snapshot, setSnapshot] = useState<AppUrlSnapshot>(() => readAppUrlFromLocation());
+  const [historyEpoch, setHistoryEpoch] = useState(0);
 
   useEffect(() => {
-    const onPopState = () => setSnapshot(readAppUrlFromLocation());
+    const onPopState = () => {
+      setSnapshot(readAppUrlFromLocation());
+      setHistoryEpoch((n) => n + 1);
+    };
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
@@ -77,13 +83,22 @@ export function AppUrlProvider({ children }: { children: ReactNode }) {
   const value = useMemo(
     () => ({
       snapshot,
+      historyEpoch,
       setProjectFilter,
       setActiveScriptId,
       setActiveConnectionId,
       syncAppView,
       renameProjectParam,
     }),
-    [snapshot, setProjectFilter, setActiveScriptId, setActiveConnectionId, syncAppView, renameProjectParam],
+    [
+      snapshot,
+      historyEpoch,
+      setProjectFilter,
+      setActiveScriptId,
+      setActiveConnectionId,
+      syncAppView,
+      renameProjectParam,
+    ],
   );
 
   return <AppUrlContext.Provider value={value}>{children}</AppUrlContext.Provider>;
