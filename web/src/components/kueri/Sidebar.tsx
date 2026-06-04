@@ -7,6 +7,7 @@ import { CreateConnectionDialog } from "@/components/kueri/CreateConnectionDialo
 import { CreateWorkspaceDialog } from "@/components/kueri/CreateWorkspaceDialog";
 import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
 import { RenameDialog } from "@/components/kueri/RenameDialog";
+import { ScriptTagsDialog } from "@/components/kueri/ScriptTagsDialog";
 import { SidebarItemMenu } from "@/components/kueri/SidebarItemMenu";
 import { SidebarSectionSkeleton } from "@/components/kueri/SidebarSectionSkeleton";
 import { useKueriApp } from "@/context/kueri-app";
@@ -53,6 +54,8 @@ type RenameTarget =
   | { kind: "workspace"; id: number; name: string }
   | { kind: "script"; id: number; name: string };
 
+type TagsTarget = { id: number; title: string; tags: string[] };
+
 type DeleteTarget =
   | { kind: "workspace"; id: number; name: string }
   | { kind: "connection"; workspaceId: number; id: number; name: string }
@@ -60,7 +63,7 @@ type DeleteTarget =
 
 export function Sidebar() {
   const queryClient = useQueryClient();
-  const { me, workspaces, scripts, isLoading, openScript, closeScript } = useKueriApp();
+  const { workspaces, scripts, isLoading, openScript, closeScript, createNewScript } = useKueriApp();
   const hasHydrated = useWorkspaceStore((s) => s._hasHydrated);
   const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
   const setSelectedConnection = useWorkspaceStore((s) => s.setSelectedConnection);
@@ -73,6 +76,7 @@ export function Sidebar() {
     workspaceName: string;
   } | null>(null);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
+  const [tagsTarget, setTagsTarget] = useState<TagsTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [prodDialogOpen, setProdDialogOpen] = useState(false);
   const pendingConnection = useRef<SelectedConnection | null>(null);
@@ -159,18 +163,48 @@ export function Sidebar() {
             c.display_host.toLowerCase().includes(q),
         ),
       }))
-      .filter((ws) => ws.name.toLowerCase().includes(q) || ws.connections.length > 0);
-  }, [workspaces, search]);
+      .filter((ws) => {
+        const hasMatchingScript = scripts.some(
+          (s) =>
+            s.workspace_id === ws.id &&
+            (s.title.toLowerCase().includes(q) ||
+              s.tags.some((t) => t.name.toLowerCase().includes(q))),
+        );
+        return ws.name.toLowerCase().includes(q) || ws.connections.length > 0 || hasMatchingScript;
+      });
+  }, [workspaces, scripts, search]);
 
-  const filteredScripts = useMemo(() => {
+  const scriptsByWorkspace = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return scripts;
-    return scripts.filter(
-      (s) =>
+    const map = new Map<number, Script[]>();
+    for (const ws of workspaces) {
+      map.set(ws.id, []);
+    }
+    for (const s of scripts) {
+      const list = map.get(s.workspace_id) ?? [];
+      if (
+        !q ||
         s.title.toLowerCase().includes(q) ||
-        s.tags.some((t) => t.name.toLowerCase().includes(q)),
-    );
-  }, [scripts, search]);
+        s.tags.some((t) => t.name.toLowerCase().includes(q))
+      ) {
+        list.push(s);
+        map.set(s.workspace_id, list);
+      }
+    }
+    return map;
+  }, [workspaces, scripts, search]);
+
+  const tagsMutation = useMutation({
+    mutationFn: async (target: TagsTarget & { tags: string[] }) =>
+      updateScript(target.id, { tags: target.tags }),
+    onSuccess: async (script, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["scripts"] });
+      queryClient.setQueryData(["script", variables.id], script);
+      showSuccess(`Tags updated for "${script.title}"`);
+      setTagsTarget(null);
+    },
+    onError: handleMutationError,
+  });
 
   useEffect(() => {
     if (!hasHydrated || isLoading || workspaces.length === 0) return;
@@ -257,7 +291,7 @@ export function Sidebar() {
                   </span>
                   <button
                     type="button"
-                    className="text-muted-foreground hover:text-electric transition-colors"
+                    className="text-muted-foreground hover:text-foreground transition-colors"
                     aria-label="Add workspace"
                     onClick={() => setWorkspaceDialogOpen(true)}
                   >
@@ -285,7 +319,7 @@ export function Sidebar() {
                                 open && "rotate-90",
                               )}
                             />
-                            <FolderGit2 className="size-3.5 text-muted-foreground group-hover:text-electric transition-colors shrink-0" />
+                            <FolderGit2 className="size-3.5 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
                             <span className="truncate">{ws.name}</span>
                           </button>
                           <SidebarItemMenu
@@ -302,14 +336,14 @@ export function Sidebar() {
                             onClick={() =>
                               setConnectionDialog({ workspaceId: ws.id, workspaceName: ws.name })
                             }
-                            className="shrink-0 p-1.5 text-muted-foreground hover:text-electric transition-colors rounded-md"
+                            className="shrink-0 p-1.5 text-muted-foreground hover:text-foreground transition-colors rounded-md"
                           >
                             <Plus className="size-3" />
                           </button>
                         </div>
 
                         {open && (
-                          <div className="ml-6 mt-0.5 mb-1 space-y-0.5 border-l border-border/70 pl-2">
+                          <div className="ml-6 mt-0.5 mb-1 space-y-1 border-l border-border/70 pl-2">
                             {ws.connections.length === 0 && (
                               <p className="px-2 py-1 text-[10px] text-muted-foreground">No connections</p>
                             )}
@@ -346,6 +380,65 @@ export function Sidebar() {
                                 />
                               </div>
                             ))}
+
+                            <div className="pt-1">
+                              <div className="px-2 flex items-center justify-between mb-0.5">
+                                <span className="text-[10px] uppercase tracking-[0.12em] text-muted-foreground font-semibold">
+                                  Scripts
+                                </span>
+                                <button
+                                  type="button"
+                                  aria-label={`New script in ${ws.name}`}
+                                  onClick={() => void createNewScript(ws.id)}
+                                  className="p-0.5 text-muted-foreground hover:text-foreground transition-colors rounded"
+                                >
+                                  <Plus className="size-3" />
+                                </button>
+                              </div>
+                              {(scriptsByWorkspace.get(ws.id) ?? []).length === 0 ? (
+                                <p className="px-2 py-1 text-[10px] text-muted-foreground">No scripts</p>
+                              ) : (
+                                <div className="space-y-0.5">
+                                  {(scriptsByWorkspace.get(ws.id) ?? []).map((s) => (
+                                    <div key={s.id} className="group flex items-start gap-0.5">
+                                      <button
+                                        type="button"
+                                        onClick={() => openScript(s.id)}
+                                        className="flex-1 text-left px-2 py-1.5 rounded-md hover:bg-surface-1 transition-colors min-w-0"
+                                      >
+                                        <div className="flex items-center gap-2">
+                                          <FileCode2 className="size-3 text-muted-foreground group-hover:text-foreground transition-colors shrink-0" />
+                                          <span className="text-xs truncate">{s.title}</span>
+                                        </div>
+                                        {s.tags.length > 0 && (
+                                          <div className="flex flex-wrap gap-1 mt-1 pl-5">
+                                            {s.tags.map((t) => (
+                                              <Tag key={t.name} label={t.name} color={t.color} />
+                                            ))}
+                                          </div>
+                                        )}
+                                      </button>
+                                      <SidebarItemMenu
+                                        className="mt-1"
+                                        onEdit={() =>
+                                          setRenameTarget({ kind: "script", id: s.id, name: s.title })
+                                        }
+                                        onTags={() =>
+                                          setTagsTarget({
+                                            id: s.id,
+                                            title: s.title,
+                                            tags: s.tags.map((t) => t.name),
+                                          })
+                                        }
+                                        onDelete={() =>
+                                          setDeleteTarget({ kind: "script", id: s.id, name: s.title })
+                                        }
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                           </div>
                         )}
                       </div>
@@ -353,60 +446,8 @@ export function Sidebar() {
                   })}
                 </div>
               </div>
-
-              <div>
-                <div className="px-2 flex items-center justify-between mb-1.5">
-                  <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
-                    Script Library
-                  </span>
-                </div>
-
-                <div className="space-y-1">
-                  {filteredScripts.length === 0 && (
-                    <p className="px-2 text-xs text-muted-foreground">No scripts match your search.</p>
-                  )}
-                  {filteredScripts.map((s) => (
-                    <div key={s.id} className="group flex items-start gap-0.5">
-                      <button
-                        type="button"
-                        onClick={() => openScript(s.id)}
-                        className="flex-1 text-left px-2 py-2 rounded-md hover:bg-surface-1 transition-colors min-w-0"
-                      >
-                        <div className="flex items-center gap-2">
-                          <FileCode2 className="size-3.5 text-muted-foreground group-hover:text-neon transition-colors shrink-0" />
-                          <span className="text-xs truncate">{s.title}</span>
-                        </div>
-                        {s.tags.length > 0 && (
-                          <div className="flex flex-wrap gap-1 mt-1.5 pl-5">
-                            {s.tags.map((t) => (
-                              <Tag key={t.name} label={t.name} color={t.color} />
-                            ))}
-                          </div>
-                        )}
-                      </button>
-                      <SidebarItemMenu
-                        className="mt-1.5"
-                        onEdit={() => setRenameTarget({ kind: "script", id: s.id, name: s.title })}
-                        onDelete={() =>
-                          setDeleteTarget({ kind: "script", id: s.id, name: s.title })
-                        }
-                      />
-                    </div>
-                  ))}
-                </div>
-              </div>
             </>
           )}
-        </div>
-
-        <div className="border-t border-sidebar-border px-3 py-2 flex items-center gap-2">
-          <div className="size-6 rounded-full bg-gradient-to-br from-electric to-neon" />
-          <div className="text-xs">
-            <div className="leading-tight">{me?.name ?? "Guest"}</div>
-            <div className="text-[10px] text-muted-foreground leading-tight capitalize">
-              {me?.plan ?? "loading"} plan
-            </div>
-          </div>
         </div>
       </aside>
 
@@ -432,6 +473,19 @@ export function Sidebar() {
           setProdDialogOpen(false);
         }}
       />
+
+      {tagsTarget && (
+        <ScriptTagsDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setTagsTarget(null);
+          }}
+          scriptTitle={tagsTarget.title}
+          initialTags={tagsTarget.tags}
+          isPending={tagsMutation.isPending}
+          onSubmit={(tags) => tagsMutation.mutate({ ...tagsTarget, tags })}
+        />
+      )}
 
       {renameTarget && (
         <RenameDialog

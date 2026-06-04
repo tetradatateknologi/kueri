@@ -8,10 +8,14 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { ApiError } from "@/lib/api/http";
 import { getMe } from "@/lib/api/me";
 import { createScript, getScript, listScripts, updateScript } from "@/lib/api/scripts";
+import { showValidationError } from "@/lib/toasts";
 import type { Script, User, Workspace } from "@/lib/api/types";
+import { generateNewScriptTitle } from "@/lib/script-title";
 import { listWorkspaces } from "@/lib/api/workspaces";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 type KueriAppContextValue = {
   me: User | undefined;
@@ -30,7 +34,7 @@ type KueriAppContextValue = {
   saveActiveScript: () => Promise<void>;
   isSaving: boolean;
   refetchAll: () => void;
-  createNewScript: () => Promise<void>;
+  createNewScript: (workspaceId?: number) => Promise<void>;
 };
 
 const KueriAppContext = createContext<KueriAppContextValue | null>(null);
@@ -97,17 +101,40 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     void scriptsQuery.refetch();
   }, [meQuery, workspacesQuery, scriptsQuery]);
 
-  const createNewScript = useCallback(async () => {
-    const ws = workspacesQuery.data?.[0];
-    if (!ws) return;
-    const script = await createScript({
-      workspace_id: ws.id,
-      title: "untitled.sql",
-      sql_text: "SELECT 1;",
-    });
-    await queryClient.invalidateQueries({ queryKey: ["scripts"] });
-    openScript(script.id);
-  }, [workspacesQuery.data, queryClient, openScript]);
+  const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
+
+  const createNewScript = useCallback(
+    async (workspaceId?: number) => {
+      const workspaces = workspacesQuery.data;
+      if (!workspaces?.length) return;
+
+      const wsId =
+        workspaceId ??
+        (selectedConnection?.projectId ? Number(selectedConnection.projectId) : undefined) ??
+        workspaces[0].id;
+
+      const ws = workspaces.find((w) => w.id === wsId) ?? workspaces[0];
+      const existing = scriptsQuery.data ?? [];
+      const title = generateNewScriptTitle(existing.filter((s) => s.workspace_id === ws.id));
+
+      try {
+        const script = await createScript({
+          workspace_id: ws.id,
+          title,
+          sql_text: "SELECT 1;",
+        });
+        await queryClient.invalidateQueries({ queryKey: ["scripts"] });
+        queryClient.setQueryData(["script", script.id], script);
+        openScript(script.id);
+        setDraftSql(script.sql_text);
+      } catch (err) {
+        const message =
+          err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to create script";
+        showValidationError(message);
+      }
+    },
+    [workspacesQuery.data, scriptsQuery.data, selectedConnection?.projectId, queryClient, openScript],
+  );
 
   const isLoading = meQuery.isLoading || workspacesQuery.isLoading || scriptsQuery.isLoading;
   const error = (meQuery.error ?? workspacesQuery.error ?? scriptsQuery.error) as Error | null;
