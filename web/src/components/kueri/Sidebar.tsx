@@ -423,6 +423,9 @@ export function Sidebar() {
           }}
           workspaceId={connectionDialog.workspaceId}
           workspaceName={connectionDialog.workspaceName}
+          existingConnections={
+            workspaces.find((ws) => ws.id === connectionDialog.workspaceId)?.connections ?? []
+          }
         />
       )}
       <ProductionEnvDialog
