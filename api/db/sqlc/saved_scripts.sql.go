@@ -82,6 +82,45 @@ func (q *Queries) LinkScriptTag(ctx context.Context, arg LinkScriptTagParams) er
 	return err
 }
 
+const listSavedScriptsByUser = `-- name: ListSavedScriptsByUser :many
+SELECT s.id, s.workspace_id, s.user_id, s.title, s.sql_text, s.created_at, s.updated_at, s.deleted_at
+FROM saved_scripts s
+INNER JOIN workspaces w ON w.id = s.workspace_id
+WHERE w.user_id = $1
+  AND s.deleted_at IS NULL
+  AND w.deleted_at IS NULL
+ORDER BY s.updated_at DESC
+`
+
+func (q *Queries) ListSavedScriptsByUser(ctx context.Context, userID int64) ([]SavedScript, error) {
+	rows, err := q.db.Query(ctx, listSavedScriptsByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []SavedScript{}
+	for rows.Next() {
+		var i SavedScript
+		if err := rows.Scan(
+			&i.ID,
+			&i.WorkspaceID,
+			&i.UserID,
+			&i.Title,
+			&i.SqlText,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSavedScriptsByWorkspace = `-- name: ListSavedScriptsByWorkspace :many
 SELECT id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at
 FROM saved_scripts

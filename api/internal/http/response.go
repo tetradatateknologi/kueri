@@ -24,6 +24,22 @@ func Success(c echo.Context, data interface{}) error {
 	return c.JSON(http.StatusOK, Response{Data: data})
 }
 
+func Created(c echo.Context, data interface{}) error {
+	return c.JSON(http.StatusCreated, Response{Data: data})
+}
+
+func BadRequest(c echo.Context, message string) error {
+	return c.JSON(http.StatusBadRequest, ErrorResponse{
+		Error: ErrorBody{Code: "BAD_REQUEST", Message: message},
+	})
+}
+
+func NotFound(c echo.Context, message string) error {
+	return c.JSON(http.StatusNotFound, ErrorResponse{
+		Error: ErrorBody{Code: "NOT_FOUND", Message: message},
+	})
+}
+
 func InternalError(c echo.Context, message string, err error) error {
 	if err != nil {
 		slog.Error(message, "error", err)

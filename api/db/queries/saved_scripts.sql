@@ -49,3 +49,12 @@ FROM script_tags t
 INNER JOIN saved_script_tags st ON st.tag_id = t.id
 WHERE st.script_id = $1
 ORDER BY t.name;
+
+-- name: ListSavedScriptsByUser :many
+SELECT s.*
+FROM saved_scripts s
+INNER JOIN workspaces w ON w.id = s.workspace_id
+WHERE w.user_id = $1
+  AND s.deleted_at IS NULL
+  AND w.deleted_at IS NULL
+ORDER BY s.updated_at DESC;

@@ -11,7 +11,12 @@ import (
 type Config struct {
 	App  AppConfig
 	DB   DBConfig
+	Dev  DevConfig
 	CORS CORSConfig
+}
+
+type DevConfig struct {
+	UserEmail string
 }
 
 type AppConfig struct {
@@ -54,6 +59,7 @@ func Load() (*Config, error) {
 			Host: "localhost", Port: 5433, User: "kueri", Password: "kueri_secret",
 			Name: "kueri", SSLMode: "disable", MaxConns: 25, MinConns: 5,
 		},
+		Dev: DevConfig{UserEmail: "dev@kueri.local"},
 		CORS: CORSConfig{
 			AllowedOrigins: []string{
 				"http://localhost:5173",
@@ -102,6 +108,9 @@ func Load() (*Config, error) {
 		if n, err := strconv.ParseInt(v, 10, 32); err == nil && n > 0 {
 			cfg.DB.MinConns = int32(n)
 		}
+	}
+	if v := strings.TrimSpace(os.Getenv("DEV_USER_EMAIL")); v != "" {
+		cfg.Dev.UserEmail = v
 	}
 	if v := strings.TrimSpace(os.Getenv("CORS_ALLOWED_ORIGINS")); v != "" {
 		parts := strings.Split(v, ",")

@@ -1,0 +1,43 @@
+export type User = {
+  id: number;
+  name: string;
+  email: string;
+  plan: string;
+};
+
+export type Connection = {
+  id: number;
+  name: string;
+  environment: string;
+  env_key: "dev" | "staging" | "prod";
+  host: string;
+  port: number;
+  display_host: string;
+  driver: string;
+};
+
+export type Workspace = {
+  id: number;
+  name: string;
+  connections: Connection[];
+};
+
+export type ScriptTag = {
+  name: string;
+  color: "electric" | "neon" | "danger";
+};
+
+export type Script = {
+  id: number;
+  workspace_id: number;
+  title: string;
+  sql_text: string;
+  tags: ScriptTag[];
+};
+
+export type QueryRunResult = {
+  row_count: number;
+  duration_ms: number;
+  columns: string[];
+  rows: Record<string, unknown>[];
+};

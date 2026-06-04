@@ -1,16 +1,5 @@
 import { ArrowUpDown } from "lucide-react";
-
-const columns = ["id", "customer", "email", "total", "status", "created_at"];
-const rows = [
-  [1024, "Ava Martinez", "ava@northwind.io", "$248.00", "paid", "2026-05-31 14:02"],
-  [1025, "Liam Chen", "liam.c@acme.dev", "$1,820.50", "paid", "2026-05-31 14:11"],
-  [1026, "Noah Patel", "noah@studio.co", "$72.10", "refunded", "2026-05-31 14:24"],
-  [1027, "Mia Thompson", "mia.t@hello.com", "$540.00", "pending", "2026-05-31 14:48"],
-  [1028, "Ethan Brooks", "ethan@brooks.dev", "$96.75", "paid", "2026-05-31 15:02"],
-  [1029, "Sofia Rivera", "sofia@rivera.io", "$2,310.00", "paid", "2026-05-31 15:33"],
-  [1030, "Lucas Wright", "lucas@wright.co", "$18.40", "failed", "2026-05-31 15:51"],
-  [1031, "Zoe Nakamura", "zoe@nakamura.jp", "$415.20", "paid", "2026-05-31 16:09"],
-];
+import type { QueryRunResult } from "@/lib/api/types";
 
 const statusColor: Record<string, string> = {
   paid: "text-neon bg-neon/10 border-neon/30",
@@ -19,7 +8,21 @@ const statusColor: Record<string, string> = {
   failed: "text-destructive bg-destructive/10 border-destructive/30",
 };
 
-export function ResultsGrid() {
+type ResultsGridProps = {
+  result: QueryRunResult | null;
+};
+
+export function ResultsGrid({ result }: ResultsGridProps) {
+  if (!result) {
+    return (
+      <div className="h-full flex items-center justify-center text-xs text-muted-foreground font-mono">
+        No results yet
+      </div>
+    );
+  }
+
+  const columns = result.columns;
+
   return (
     <div className="h-full overflow-auto">
       <table className="w-full text-xs font-mono">
@@ -40,31 +43,35 @@ export function ResultsGrid() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r, i) => (
+          {result.rows.map((row, i) => (
             <tr
               key={i}
               className="border-b border-border/60 hover:bg-surface-1/60 transition-colors"
             >
               <td className="px-3 py-2 text-muted-foreground">{i + 1}</td>
-              {r.map((cell, j) => (
-                <td key={j} className="px-3 py-2">
-                  {columns[j] === "status" ? (
-                    <span
-                      className={`px-2 py-0.5 rounded-full border text-[10px] ${statusColor[String(cell)]}`}
-                    >
-                      {cell}
-                    </span>
-                  ) : (
-                    String(cell)
-                  )}
-                </td>
-              ))}
+              {columns.map((col) => {
+                const cell = row[col];
+                const display = cell == null ? "" : String(cell);
+                return (
+                  <td key={col} className="px-3 py-2">
+                    {col === "status" ? (
+                      <span
+                        className={`px-2 py-0.5 rounded-full border text-[10px] ${statusColor[display] ?? "border-border"}`}
+                      >
+                        {display}
+                      </span>
+                    ) : (
+                      display
+                    )}
+                  </td>
+                );
+              })}
             </tr>
           ))}
         </tbody>
       </table>
       <div className="px-3 py-2 text-[10px] text-muted-foreground font-mono border-t border-border bg-surface-1/40">
-        8 rows • 42 ms • cached
+        {result.row_count} rows • {result.duration_ms} ms
       </div>
     </div>
   );

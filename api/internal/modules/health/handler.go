@@ -2,6 +2,8 @@ package health
 
 import (
 	"github.com/labstack/echo/v4"
+
+	apphttp "github.com/tetradatateknologi/kueri/api/internal/http"
 )
 
 type Handler struct{}
@@ -11,9 +13,9 @@ func NewHandler() *Handler {
 }
 
 func (h *Handler) Health(c echo.Context) error {
-	return c.JSON(200, map[string]string{"status": "ok"})
+	return apphttp.Success(c, map[string]string{"status": "ok"})
 }
 
 func (h *Handler) Ping(c echo.Context) error {
-	return c.JSON(200, map[string]string{"message": "pong"})
+	return apphttp.Success(c, map[string]string{"message": "pong"})
 }
