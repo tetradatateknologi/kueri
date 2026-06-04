@@ -1,6 +1,5 @@
 import { ExternalLink, Github, Heart, MessageCircle } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
 import {
   KUERI_GITHUB_ISSUES_URL,
   KUERI_GITHUB_REPO_URL,
@@ -42,14 +41,6 @@ export function SettingsContributeSection() {
             </a>
           </div>
         </div>
-
-        <Button asChild className="gap-2">
-          <a href={KUERI_GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-            <Github className="size-4" />
-            Buka di GitHub
-            <ExternalLink className="size-3.5 opacity-70" />
-          </a>
-        </Button>
       </section>
 
       <section className="space-y-3">
