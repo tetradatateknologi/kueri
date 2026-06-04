@@ -39,9 +39,8 @@ export function KueriLogo({
     <div className={cn("inline-flex items-center gap-2.5 opacity-90", className)}>
       <div
         className={cn(
-          "relative shrink-0 overflow-hidden flex items-center justify-center",
+          "relative shrink-0 overflow-hidden flex items-center justify-center bg-gradient-to-br from-electric/20 to-neon/20",
           sizing.box,
-          !useImage && "bg-gradient-to-br from-electric to-neon shadow-[0_0_24px_-4px] shadow-electric/40",
         )}
       >
         {useImage ? (
@@ -52,7 +51,7 @@ export function KueriLogo({
             onError={() => setImgFailed(true)}
           />
         ) : (
-          <Database className={cn(sizing.icon, "text-background")} aria-hidden />
+          <Database className={cn(sizing.icon, "text-electric")} aria-hidden />
         )}
       </div>
       {showWordmark ? (
