@@ -8,14 +8,20 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import {
+  EditScriptDialog,
+  type EditScriptFormValues,
+} from "@/components/kueri/EditScriptDialog";
 import { ApiError } from "@/lib/api/http";
 import { getMe } from "@/lib/api/me";
 import { createScript, getScript, listScripts, updateScript } from "@/lib/api/scripts";
-import { showValidationError } from "@/lib/toasts";
+import { showSuccess, showValidationError } from "@/lib/toasts";
 import type { Script, User, Workspace } from "@/lib/api/types";
-import { generateNewScriptTitle } from "@/lib/script-title";
+import { generateNewScriptTitle, isReservedScriptTitle } from "@/lib/script-title";
 import { listWorkspaces } from "@/lib/api/workspaces";
 import { useWorkspaceStore } from "@/stores/workspace-store";
+
+type EditScriptTarget = { id: number; title: string; tags: string[] };
 
 type KueriAppContextValue = {
   me: User | undefined;
@@ -35,6 +41,7 @@ type KueriAppContextValue = {
   isSaving: boolean;
   refetchAll: () => void;
   createNewScript: (workspaceId?: number) => Promise<void>;
+  openEditScript: (id: number) => void;
 };
 
 const KueriAppContext = createContext<KueriAppContextValue | null>(null);
@@ -44,6 +51,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   const [openScriptIds, setOpenScriptIds] = useState<number[]>([]);
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
   const [draftSql, setDraftSql] = useState("");
+  const [editScriptTarget, setEditScriptTarget] = useState<EditScriptTarget | null>(null);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe });
   const workspacesQuery = useQuery({ queryKey: ["workspaces"], queryFn: listWorkspaces });
@@ -76,6 +84,39 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       void queryClient.invalidateQueries({ queryKey: ["scripts"] });
     },
   });
+
+  const editScriptMutation = useMutation({
+    mutationFn: async (target: EditScriptTarget & EditScriptFormValues) =>
+      updateScript(target.id, { title: target.title, tags: target.tags }),
+    onSuccess: async (script, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["scripts"] });
+      queryClient.setQueryData(["script", variables.id], script);
+      showSuccess(`Updated "${script.title}"`);
+      setEditScriptTarget(null);
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Request failed";
+      showValidationError(message);
+    },
+  });
+
+  const scripts = scriptsQuery.data ?? [];
+
+  const openEditScript = useCallback(
+    (id: number) => {
+      const fromList = scripts.find((s) => s.id === id);
+      const fromActive = activeScriptQuery.data?.id === id ? activeScriptQuery.data : undefined;
+      const script = fromList ?? fromActive;
+      if (!script) return;
+      setEditScriptTarget({
+        id: script.id,
+        title: script.title,
+        tags: script.tags.map((t) => t.name),
+      });
+    },
+    [scripts, activeScriptQuery.data],
+  );
 
   const openScript = useCallback((id: number) => {
     setOpenScriptIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
@@ -143,7 +184,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     () => ({
       me: meQuery.data,
       workspaces: workspacesQuery.data ?? [],
-      scripts: scriptsQuery.data ?? [],
+      scripts,
       isLoading,
       error,
       openScriptIds,
@@ -161,11 +202,12 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       isSaving: saveMutation.isPending,
       refetchAll,
       createNewScript,
+      openEditScript,
     }),
     [
       meQuery.data,
       workspacesQuery.data,
-      scriptsQuery.data,
+      scripts,
       isLoading,
       error,
       openScriptIds,
@@ -177,10 +219,37 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       saveMutation,
       refetchAll,
       createNewScript,
+      openEditScript,
     ],
   );
 
-  return <KueriAppContext.Provider value={value}>{children}</KueriAppContext.Provider>;
+  return (
+    <KueriAppContext.Provider value={value}>
+      {children}
+      {editScriptTarget && (
+        <EditScriptDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditScriptTarget(null);
+          }}
+          initialTitle={editScriptTarget.title}
+          initialTags={editScriptTarget.tags}
+          isPending={editScriptMutation.isPending}
+          onSubmit={(values) => {
+            if (!values.title) {
+              showValidationError("Script name is required");
+              return;
+            }
+            if (isReservedScriptTitle(values.title)) {
+              showValidationError("Choose a name other than untitled");
+              return;
+            }
+            editScriptMutation.mutate({ ...editScriptTarget, ...values });
+          }}
+        />
+      )}
+    </KueriAppContext.Provider>
+  );
 }
 
 export function useKueriApp() {

@@ -1,4 +1,4 @@
-import { MoreHorizontal, Pencil, Tags, Trash2 } from "lucide-react";
+import { MoreHorizontal, Pencil, Trash2 } from "lucide-react";
 
 import {
   DropdownMenu,
@@ -11,20 +11,16 @@ import { cn } from "@/lib/utils";
 
 type SidebarItemMenuProps = {
   onEdit?: () => void;
-  onTags?: () => void;
   onDelete: () => void;
   editLabel?: string;
-  tagsLabel?: string;
   deleteLabel?: string;
   className?: string;
 };
 
 export function SidebarItemMenu({
   onEdit,
-  onTags,
   onDelete,
-  editLabel = "Rename",
-  tagsLabel = "Edit tags",
+  editLabel = "Edit",
   deleteLabel = "Delete",
   className,
 }: SidebarItemMenuProps) {
@@ -45,28 +41,19 @@ export function SidebarItemMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-40">
         {onEdit && (
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onEdit();
-            }}
-          >
-            <Pencil className="size-3.5 mr-2" />
-            {editLabel}
-          </DropdownMenuItem>
+          <>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+                onEdit();
+              }}
+            >
+              <Pencil className="size-3.5 mr-2" />
+              {editLabel}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
         )}
-        {onTags && (
-          <DropdownMenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              onTags();
-            }}
-          >
-            <Tags className="size-3.5 mr-2" />
-            {tagsLabel}
-          </DropdownMenuItem>
-        )}
-        {(onEdit || onTags) && <DropdownMenuSeparator />}
         <DropdownMenuItem
           className="text-destructive focus:text-destructive focus:bg-destructive/10"
           onClick={(e) => {

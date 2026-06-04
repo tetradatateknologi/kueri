@@ -7,12 +7,11 @@ import { CreateConnectionDialog } from "@/components/kueri/CreateConnectionDialo
 import { CreateWorkspaceDialog } from "@/components/kueri/CreateWorkspaceDialog";
 import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
 import { RenameDialog } from "@/components/kueri/RenameDialog";
-import { ScriptTagsDialog } from "@/components/kueri/ScriptTagsDialog";
 import { SidebarItemMenu } from "@/components/kueri/SidebarItemMenu";
 import { SidebarSectionSkeleton } from "@/components/kueri/SidebarSectionSkeleton";
 import { useKueriApp } from "@/context/kueri-app";
 import { ApiError } from "@/lib/api/http";
-import { deleteScript, updateScript } from "@/lib/api/scripts";
+import { deleteScript } from "@/lib/api/scripts";
 import type { Script, Workspace } from "@/lib/api/types";
 import {
   deleteConnection,
@@ -50,11 +49,7 @@ function Tag({ label, color }: { label: string; color: string }) {
   );
 }
 
-type RenameTarget =
-  | { kind: "workspace"; id: number; name: string }
-  | { kind: "script"; id: number; name: string };
-
-type TagsTarget = { id: number; title: string; tags: string[] };
+type RenameTarget = { kind: "workspace"; id: number; name: string };
 
 type DeleteTarget =
   | { kind: "workspace"; id: number; name: string }
@@ -63,7 +58,8 @@ type DeleteTarget =
 
 export function Sidebar() {
   const queryClient = useQueryClient();
-  const { workspaces, scripts, isLoading, openScript, closeScript, createNewScript } = useKueriApp();
+  const { workspaces, scripts, isLoading, openScript, closeScript, createNewScript, openEditScript } =
+    useKueriApp();
   const hasHydrated = useWorkspaceStore((s) => s._hasHydrated);
   const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
   const setSelectedConnection = useWorkspaceStore((s) => s.setSelectedConnection);
@@ -76,7 +72,6 @@ export function Sidebar() {
     workspaceName: string;
   } | null>(null);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
-  const [tagsTarget, setTagsTarget] = useState<TagsTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const [prodDialogOpen, setProdDialogOpen] = useState(false);
   const pendingConnection = useRef<SelectedConnection | null>(null);
@@ -88,29 +83,17 @@ export function Sidebar() {
   };
 
   const renameMutation = useMutation({
-    mutationFn: async (target: RenameTarget & { name: string }) => {
-      if (target.kind === "workspace") {
-        return updateWorkspace(target.id, { name: target.name });
+    mutationFn: async (target: RenameTarget & { name: string }) =>
+      updateWorkspace(target.id, { name: target.name }),
+    onSuccess: async (ws, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      if (selectedConnection?.projectId === String(variables.id)) {
+        setSelectedConnection({
+          ...selectedConnection,
+          projectName: ws.name,
+        });
       }
-      return updateScript(target.id, { title: target.name });
-    },
-    onSuccess: async (data, variables) => {
-      if (variables.kind === "workspace") {
-        const ws = data as Workspace;
-        await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-        if (selectedConnection?.projectId === String(variables.id)) {
-          setSelectedConnection({
-            ...selectedConnection,
-            projectName: ws.name,
-          });
-        }
-        showSuccess(`Workspace renamed to "${ws.name}"`);
-      } else {
-        const script = data as Script;
-        await queryClient.invalidateQueries({ queryKey: ["scripts"] });
-        queryClient.setQueryData(["script", variables.id], script);
-        showSuccess(`Script renamed to "${script.title}"`);
-      }
+      showSuccess(`Workspace renamed to "${ws.name}"`);
       setRenameTarget(null);
     },
     onError: handleMutationError,
@@ -193,18 +176,6 @@ export function Sidebar() {
     }
     return map;
   }, [workspaces, scripts, search]);
-
-  const tagsMutation = useMutation({
-    mutationFn: async (target: TagsTarget & { tags: string[] }) =>
-      updateScript(target.id, { tags: target.tags }),
-    onSuccess: async (script, variables) => {
-      await queryClient.invalidateQueries({ queryKey: ["scripts"] });
-      queryClient.setQueryData(["script", variables.id], script);
-      showSuccess(`Tags updated for "${script.title}"`);
-      setTagsTarget(null);
-    },
-    onError: handleMutationError,
-  });
 
   useEffect(() => {
     if (!hasHydrated || isLoading || workspaces.length === 0) return;
@@ -323,6 +294,7 @@ export function Sidebar() {
                             <span className="truncate">{ws.name}</span>
                           </button>
                           <SidebarItemMenu
+                            editLabel="Rename"
                             onEdit={() =>
                               setRenameTarget({ kind: "workspace", id: ws.id, name: ws.name })
                             }
@@ -420,16 +392,7 @@ export function Sidebar() {
                                       </button>
                                       <SidebarItemMenu
                                         className="mt-1"
-                                        onEdit={() =>
-                                          setRenameTarget({ kind: "script", id: s.id, name: s.title })
-                                        }
-                                        onTags={() =>
-                                          setTagsTarget({
-                                            id: s.id,
-                                            title: s.title,
-                                            tags: s.tags.map((t) => t.name),
-                                          })
-                                        }
+                                        onEdit={() => openEditScript(s.id)}
                                         onDelete={() =>
                                           setDeleteTarget({ kind: "script", id: s.id, name: s.title })
                                         }
@@ -474,34 +437,17 @@ export function Sidebar() {
         }}
       />
 
-      {tagsTarget && (
-        <ScriptTagsDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) setTagsTarget(null);
-          }}
-          scriptTitle={tagsTarget.title}
-          initialTags={tagsTarget.tags}
-          isPending={tagsMutation.isPending}
-          onSubmit={(tags) => tagsMutation.mutate({ ...tagsTarget, tags })}
-        />
-      )}
-
       {renameTarget && (
         <RenameDialog
           open
           onOpenChange={(open) => {
             if (!open) setRenameTarget(null);
           }}
-          title={renameTarget.kind === "workspace" ? "Rename workspace" : "Rename script"}
-          description={
-            renameTarget.kind === "workspace"
-              ? "Update the workspace name shown in the sidebar."
-              : "Update the script title shown in the library and editor tabs."
-          }
-          label={renameTarget.kind === "workspace" ? "Workspace name" : "Script title"}
+          title="Rename workspace"
+          description="Update the workspace name shown in the sidebar."
+          label="Workspace name"
           initialName={renameTarget.name}
-          placeholder={renameTarget.kind === "workspace" ? "My project" : "query.sql"}
+          placeholder="My project"
           isPending={renameMutation.isPending}
           onSubmit={(name) => {
             if (!name) {

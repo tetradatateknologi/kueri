@@ -52,6 +52,7 @@ export function Workspace() {
     isSaving,
     isLoading,
     createNewScript,
+    openEditScript,
   } = useKueriApp();
 
   const env = useWorkspaceStore((s) => s.env);
@@ -173,11 +174,21 @@ export function Workspace() {
                   role="tab"
                   aria-selected={isActive}
                   tabIndex={isActive ? 0 : -1}
-                  onClick={() => setActiveScriptId(t.id)}
+                  onClick={() => {
+                    if (isActive) {
+                      openEditScript(t.id);
+                    } else {
+                      setActiveScriptId(t.id);
+                    }
+                  }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
-                      setActiveScriptId(t.id);
+                      if (isActive) {
+                        openEditScript(t.id);
+                      } else {
+                        setActiveScriptId(t.id);
+                      }
                     }
                   }}
                   className={cn(
