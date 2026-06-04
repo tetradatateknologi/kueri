@@ -185,14 +185,14 @@ func (s *Service) TestConnection(ctx context.Context, userID, workspaceID int64,
 	}
 
 	conn := sqlc.Connection{
+		Driver:       params.Driver,
 		Host:         params.Host,
 		Port:         params.Port,
 		DatabaseName: params.DatabaseName,
 		Username:     params.Username,
 		SslMode:      params.SslMode,
 	}
-	dsn := database.PostgresDSN(conn, in.Password)
-	return database.PingDSN(ctx, dsn)
+	return database.PingConnection(ctx, conn, in.Password)
 }
 
 func trimName(name string) string {

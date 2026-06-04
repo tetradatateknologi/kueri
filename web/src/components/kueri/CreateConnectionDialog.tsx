@@ -20,7 +20,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api/http";
-import type { ConnectionInput } from "@/lib/api/types";
+import type { ConnectionDriver, ConnectionInput } from "@/lib/api/types";
 import { createConnection, testConnection } from "@/lib/api/workspaces";
 import { showSuccess, showValidationError } from "@/lib/toasts";
 
@@ -31,16 +31,27 @@ type CreateConnectionDialogProps = {
   workspaceName: string;
 };
 
-const defaultForm: ConnectionInput = {
+const sharedDefaults = {
   name: "Development",
   environment: "development",
-  driver: "postgres",
   host: "localhost",
-  port: 5433,
   database_name: "kueri",
   username: "kueri",
   password: "kueri_secret",
   ssl_mode: "disable",
+} as const;
+
+const defaultsByDriver: Record<ConnectionDriver, ConnectionInput> = {
+  postgres: {
+    ...sharedDefaults,
+    driver: "postgres",
+    port: 5433,
+  },
+  mysql: {
+    ...sharedDefaults,
+    driver: "mysql",
+    port: 3306,
+  },
 };
 
 export function CreateConnectionDialog({
@@ -49,14 +60,29 @@ export function CreateConnectionDialog({
   workspaceId,
   workspaceName,
 }: CreateConnectionDialogProps) {
-  const [form, setForm] = useState<ConnectionInput>(defaultForm);
+  const [form, setForm] = useState<ConnectionInput>(defaultsByDriver.postgres);
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    if (open) setForm(defaultForm);
+    if (open) setForm(defaultsByDriver.postgres);
   }, [open]);
 
   const patch = (partial: Partial<ConnectionInput>) => setForm((f) => ({ ...f, ...partial }));
+
+  const setDriver = (driver: ConnectionDriver) => {
+    setForm((f) => ({
+      ...defaultsByDriver[driver],
+      name: f.name,
+      environment: f.environment,
+      host: f.host,
+      database_name: f.database_name,
+      username: f.username,
+      password: f.password,
+      ssl_mode: f.ssl_mode,
+      driver,
+      port: defaultsByDriver[driver].port,
+    }));
+  };
 
   const body = (): ConnectionInput => ({
     ...form,
@@ -64,7 +90,7 @@ export function CreateConnectionDialog({
     host: form.host.trim(),
     database_name: form.database_name.trim(),
     username: form.username.trim(),
-    driver: "postgres",
+    driver: form.driver,
   });
 
   const testMutation = useMutation({
@@ -104,6 +130,7 @@ export function CreateConnectionDialog({
   };
 
   const busy = testMutation.isPending || createMutation.isPending;
+  const driverLabel = form.driver === "mysql" ? "MySQL" : "PostgreSQL";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -111,11 +138,23 @@ export function CreateConnectionDialog({
         <DialogHeader>
           <DialogTitle>New connection</DialogTitle>
           <DialogDescription>
-            Add a PostgreSQL connection to <span className="font-mono text-foreground">{workspaceName}</span>.
+            Add a {driverLabel} connection to <span className="font-mono text-foreground">{workspaceName}</span>.
           </DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3 py-2">
+          <div>
+            <Label className="text-xs text-muted-foreground">Database type</Label>
+            <Select value={form.driver} onValueChange={(v) => setDriver(v as ConnectionDriver)}>
+              <SelectTrigger className="mt-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="postgres">PostgreSQL</SelectItem>
+                <SelectItem value="mysql">MySQL</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div>
             <Label className="text-xs text-muted-foreground">Display name</Label>
             <Input className="mt-1" value={form.name} onChange={(e) => patch({ name: e.target.value })} />

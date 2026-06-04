@@ -48,19 +48,40 @@ func (e *Executor) Execute(ctx context.Context, userID int64, connectionID int64
 		}
 	}
 
-	dsn := database.PostgresDSN(conn, password)
 	start := time.Now()
-
 	execCtx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
-	target, err := pgx.Connect(execCtx, dsn)
+	switch conn.Driver {
+	case sqlc.ConnectionDriverPostgres:
+		result, err := e.executePostgres(execCtx, conn, password, sql)
+		if err != nil {
+			return ExecuteResult{}, err
+		}
+		result.DurationMs = time.Since(start).Milliseconds()
+		return result, nil
+	case sqlc.ConnectionDriverMysql:
+		result, err := e.executeMySQL(execCtx, conn, password, sql)
+		if err != nil {
+			return ExecuteResult{}, err
+		}
+		result.DurationMs = time.Since(start).Milliseconds()
+		return result, nil
+	default:
+		return ExecuteResult{}, fmt.Errorf("unsupported driver: %s", conn.Driver)
+	}
+}
+
+func (e *Executor) executePostgres(ctx context.Context, conn sqlc.Connection, password, sql string) (ExecuteResult, error) {
+	dsn := database.PostgresDSN(conn, password)
+
+	target, err := pgx.Connect(ctx, dsn)
 	if err != nil {
 		return ExecuteResult{}, err
 	}
 	defer target.Close(context.Background())
 
-	rows, err := target.Query(execCtx, sql)
+	rows, err := target.Query(ctx, sql)
 	if err != nil {
 		return ExecuteResult{}, err
 	}
@@ -97,10 +118,65 @@ func (e *Executor) Execute(ctx context.Context, userID int64, connectionID int64
 	}
 
 	return ExecuteResult{
-		Columns:    columns,
-		Rows:       outRows,
-		RowCount:   rowCount,
-		DurationMs: time.Since(start).Milliseconds(),
-		Cached:     false,
+		Columns:  columns,
+		Rows:     outRows,
+		RowCount: rowCount,
+		Cached:   false,
+	}, nil
+}
+
+func (e *Executor) executeMySQL(ctx context.Context, conn sqlc.Connection, password, sql string) (ExecuteResult, error) {
+	db, err := database.OpenMySQL(conn, password)
+	if err != nil {
+		return ExecuteResult{}, err
+	}
+	defer db.Close()
+
+	rows, err := db.QueryContext(ctx, sql)
+	if err != nil {
+		return ExecuteResult{}, err
+	}
+	defer rows.Close()
+
+	cols, err := rows.Columns()
+	if err != nil {
+		return ExecuteResult{}, err
+	}
+
+	outRows := make([][]interface{}, 0)
+	rowCount := 0
+
+	for rows.Next() {
+		if rowCount >= maxRows {
+			break
+		}
+		scanTargets := make([]interface{}, len(cols))
+		dest := make([]interface{}, len(cols))
+		for i := range dest {
+			scanTargets[i] = &dest[i]
+		}
+		if err := rows.Scan(scanTargets...); err != nil {
+			return ExecuteResult{}, err
+		}
+		values := make([]interface{}, len(cols))
+		for i, v := range dest {
+			if b, ok := v.([]byte); ok {
+				values[i] = string(b)
+			} else {
+				values[i] = v
+			}
+		}
+		outRows = append(outRows, values)
+		rowCount++
+	}
+	if err := rows.Err(); err != nil {
+		return ExecuteResult{}, err
+	}
+
+	return ExecuteResult{
+		Columns:  cols,
+		Rows:     outRows,
+		RowCount: rowCount,
+		Cached:   false,
 	}, nil
 }

@@ -52,10 +52,12 @@ export type QueryResult = {
   cached: boolean;
 };
 
+export type ConnectionDriver = "postgres" | "mysql";
+
 export type ConnectionInput = {
   name: string;
   environment: string;
-  driver?: string;
+  driver: ConnectionDriver;
   host: string;
   port: number;
   database_name: string;

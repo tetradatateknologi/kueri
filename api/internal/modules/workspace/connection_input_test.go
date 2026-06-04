@@ -27,6 +27,25 @@ func TestParseConnectionInput(t *testing.T) {
 	}
 }
 
+func TestParseConnectionInputMySQL(t *testing.T) {
+	params, err := parseConnectionInput(ConnectionInput{
+		Name:         "Dev",
+		Environment:  "development",
+		Driver:       "mysql",
+		Host:         "localhost",
+		Port:         3306,
+		DatabaseName: "app",
+		Username:     "root",
+		SSLMode:      "disable",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if params.Driver != sqlc.ConnectionDriverMysql {
+		t.Fatalf("driver: %s", params.Driver)
+	}
+}
+
 func TestParseConnectionInputRejectsEmptyName(t *testing.T) {
 	_, err := parseConnectionInput(ConnectionInput{
 		Environment:  "dev",

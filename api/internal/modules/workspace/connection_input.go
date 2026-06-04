@@ -26,11 +26,9 @@ func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, erro
 		return sqlc.CreateConnectionParams{}, err
 	}
 
-	if driver == "" {
-		driver = string(sqlc.ConnectionDriverPostgres)
-	}
-	if driver != string(sqlc.ConnectionDriverPostgres) {
-		return sqlc.CreateConnectionParams{}, ErrInvalidInput
+	connDriver, err := parseDriver(driver)
+	if err != nil {
+		return sqlc.CreateConnectionParams{}, err
 	}
 	if sslMode == "" {
 		sslMode = "disable"
@@ -44,13 +42,24 @@ func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, erro
 	return sqlc.CreateConnectionParams{
 		Name:         name,
 		Environment:  env,
-		Driver:       sqlc.ConnectionDriverPostgres,
+		Driver:       connDriver,
 		Host:         host,
 		Port:         in.Port,
 		DatabaseName: dbName,
 		Username:     userPtr,
 		SslMode:      sslMode,
 	}, nil
+}
+
+func parseDriver(raw string) (sqlc.ConnectionDriver, error) {
+	switch strings.ToLower(strings.TrimSpace(raw)) {
+	case "", "postgres", "postgresql":
+		return sqlc.ConnectionDriverPostgres, nil
+	case "mysql":
+		return sqlc.ConnectionDriverMysql, nil
+	default:
+		return "", ErrInvalidInput
+	}
 }
 
 func parseEnvironment(raw string) (sqlc.ConnectionEnvironment, error) {
