@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Play, X, Plus, Download, Save, Clock, Loader2 } from "lucide-react";
 
+import { EnvironmentBadge } from "@/components/kueri/EnvironmentBadge";
 import { ExportModal } from "@/components/kueri/ExportModal";
 import { JsonResultsView } from "@/components/kueri/JsonResultsView";
 import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
@@ -36,12 +37,6 @@ import {
 } from "@/lib/toasts";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore, type WorkspaceEnv } from "@/stores/workspace-store";
-
-const envMeta: Record<WorkspaceEnv, { dot: string; ring: string }> = {
-  Development: { dot: "bg-env-dev", ring: "ring-env-dev/40" },
-  Staging: { dot: "bg-env-staging", ring: "ring-env-staging/40" },
-  Production: { dot: "bg-env-prod", ring: "ring-env-prod/40" },
-};
 
 export function Workspace() {
   const {
@@ -342,17 +337,7 @@ export function Workspace() {
 
         <div className="h-12 px-2 sm:px-3 flex items-center gap-1.5 sm:gap-2 border-b border-border bg-background min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 overflow-hidden">
-            <div
-              className={cn(
-                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 h-8 rounded-md bg-surface-1 border border-border text-xs ring-1 ring-transparent shrink-0",
-                envMeta[env].ring,
-              )}
-              title="Environment follows the selected sidebar connection"
-            >
-              <span className={cn("size-2 rounded-full shrink-0", envMeta[env].dot)} />
-              <span className="text-muted-foreground hidden sm:inline">env:</span>
-              <span className="font-mono truncate">{env}</span>
-            </div>
+            <EnvironmentBadge env={env} />
 
             {selectedConnection && (
               <span className="hidden lg:inline text-[11px] text-muted-foreground font-mono truncate min-w-0">
