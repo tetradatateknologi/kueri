@@ -51,6 +51,16 @@ export function AppUrlProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const setActiveScriptId = useCallback((id: number | null) => {
+    if (id != null) {
+      writeAppUrl({ scriptId: id, view: "workspace", settingsSection: null });
+      setSnapshot((s) => ({
+        ...s,
+        scriptId: id,
+        view: "workspace",
+        settingsSection: null,
+      }));
+      return;
+    }
     writeAppUrl({ scriptId: id });
     setSnapshot((s) => ({ ...s, scriptId: id }));
   }, []);

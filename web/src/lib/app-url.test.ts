@@ -40,6 +40,16 @@ describe("buildAppUrlSearchParams", () => {
     expect(cleared.has("project")).toBe(false);
     expect(cleared.has("script")).toBe(false);
   });
+
+  it("clears settings view params when returning to workspace", () => {
+    const params = buildAppUrlSearchParams(
+      { view: "workspace", settingsSection: null },
+      new URLSearchParams("view=settings&section=guide&script=1"),
+    );
+    expect(params.has("view")).toBe(false);
+    expect(params.has("section")).toBe(false);
+    expect(params.get("script")).toBe("1");
+  });
 });
 
 describe("resolveWorkspaceByProjectParam", () => {
