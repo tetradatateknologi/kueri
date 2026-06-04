@@ -43,6 +43,16 @@ func (q *Queries) CreateSavedScript(ctx context.Context, arg CreateSavedScriptPa
 	return i, err
 }
 
+const deleteScriptTagsForScript = `-- name: DeleteScriptTagsForScript :exec
+DELETE FROM saved_script_tags
+WHERE script_id = $1
+`
+
+func (q *Queries) DeleteScriptTagsForScript(ctx context.Context, scriptID int64) error {
+	_, err := q.db.Exec(ctx, deleteScriptTagsForScript, scriptID)
+	return err
+}
+
 const getSavedScriptByID = `-- name: GetSavedScriptByID :one
 SELECT id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at
 FROM saved_scripts

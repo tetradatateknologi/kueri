@@ -18,13 +18,15 @@ type DeleteScriptResponse struct {
 }
 
 type UpdateScriptRequest struct {
-	Title   *string `json:"title"`
-	SqlText *string `json:"sql_text"`
+	Title   *string   `json:"title"`
+	SqlText *string   `json:"sql_text"`
+	Tags    *[]string `json:"tags"`
 }
 
 type CreateScriptRequest struct {
-	WorkspaceID int64  `json:"workspace_id"`
-	Title       string `json:"title"`
-	SqlText     string `json:"sql_text"`
+	WorkspaceID int64    `json:"workspace_id"`
+	Title       string   `json:"title"`
+	SqlText     string   `json:"sql_text"`
+	Tags        []string `json:"tags"`
 }
 

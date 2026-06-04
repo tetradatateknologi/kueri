@@ -67,6 +67,9 @@ func (h *Handler) Update(c echo.Context) error {
 		if errors.Is(err, ErrScriptNotFound) {
 			return apphttp.NotFound(c, "Script not found")
 		}
+		if errors.Is(err, ErrInvalidScriptTitle) {
+			return apphttp.BadRequest(c, "Choose a name other than untitled.sql")
+		}
 		return apphttp.InternalError(c, "Failed to update script", err)
 	}
 	return apphttp.Success(c, script)
@@ -106,6 +109,9 @@ func (h *Handler) Create(c echo.Context) error {
 	if err != nil {
 		if errors.Is(err, ErrScriptNotFound) {
 			return apphttp.NotFound(c, "Workspace not found")
+		}
+		if errors.Is(err, ErrInvalidScriptTitle) {
+			return apphttp.BadRequest(c, "Choose a name other than untitled.sql")
 		}
 		return apphttp.InternalError(c, "Failed to create script", err)
 	}

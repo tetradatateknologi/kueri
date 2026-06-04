@@ -12,7 +12,10 @@ import (
 	"github.com/tetradatateknologi/kueri/api/internal/authz"
 )
 
-var ErrScriptNotFound = errors.New("script not found")
+var (
+	ErrScriptNotFound     = errors.New("script not found")
+	ErrInvalidScriptTitle = errors.New("invalid script title")
+)
 
 type Service struct {
 	q *sqlc.Queries
@@ -61,6 +64,9 @@ func (s *Service) Update(ctx context.Context, userID, scriptID int64, req Update
 	sqlText := current.SqlText
 	if req.Title != nil {
 		title = strings.TrimSpace(*req.Title)
+		if err := validateScriptTitle(title); err != nil {
+			return ScriptResponse{}, err
+		}
 	}
 	if req.SqlText != nil {
 		sqlText = *req.SqlText
@@ -73,6 +79,11 @@ func (s *Service) Update(ctx context.Context, userID, scriptID int64, req Update
 	if err != nil {
 		return ScriptResponse{}, err
 	}
+	if req.Tags != nil {
+		if err := s.syncTags(ctx, scriptID, *req.Tags); err != nil {
+			return ScriptResponse{}, err
+		}
+	}
 	return s.mapScript(ctx, updated)
 }
 
@@ -81,20 +92,19 @@ func (s *Service) Create(ctx context.Context, userID int64, req CreateScriptRequ
 		return ScriptResponse{}, err
 	}
 	title := strings.TrimSpace(req.Title)
-	if title == "" {
-		title = "untitled.sql"
-	}
-	sqlText := req.SqlText
-	if sqlText == "" {
-		sqlText = "SELECT 1;"
+	if err := validateScriptTitle(title); err != nil {
+		return ScriptResponse{}, err
 	}
 	created, err := s.q.CreateSavedScript(ctx, sqlc.CreateSavedScriptParams{
 		WorkspaceID: req.WorkspaceID,
 		UserID:      userID,
 		Title:       title,
-		SqlText:     sqlText,
+		SqlText:     req.SqlText,
 	})
 	if err != nil {
+		return ScriptResponse{}, err
+	}
+	if err := s.syncTags(ctx, created.ID, req.Tags); err != nil {
 		return ScriptResponse{}, err
 	}
 	return s.mapScript(ctx, created)
@@ -135,6 +145,47 @@ func (s *Service) ensureWorkspaceOwner(ctx context.Context, userID, workspaceID 
 			return ErrScriptNotFound
 		}
 		return err
+	}
+	return nil
+}
+
+func validateScriptTitle(title string) error {
+	if title == "" || isUntitledTitle(title) {
+		return ErrInvalidScriptTitle
+	}
+	return nil
+}
+
+func isUntitledTitle(title string) bool {
+	lower := strings.ToLower(strings.TrimSpace(title))
+	if lower == "untitled.sql" {
+		return true
+	}
+	if strings.HasPrefix(lower, "untitled") && strings.HasSuffix(lower, ".sql") {
+		return true
+	}
+	return false
+}
+
+func (s *Service) syncTags(ctx context.Context, scriptID int64, tags []string) error {
+	if err := s.q.DeleteScriptTagsForScript(ctx, scriptID); err != nil {
+		return err
+	}
+	for _, raw := range tags {
+		name := strings.TrimSpace(raw)
+		if name == "" {
+			continue
+		}
+		tag, err := s.q.UpsertScriptTag(ctx, name)
+		if err != nil {
+			return err
+		}
+		if err := s.q.LinkScriptTag(ctx, sqlc.LinkScriptTagParams{
+			ScriptID: scriptID,
+			TagID:    tag.ID,
+		}); err != nil {
+			return err
+		}
 	}
 	return nil
 }

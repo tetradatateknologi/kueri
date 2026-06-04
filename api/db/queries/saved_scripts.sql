@@ -43,6 +43,10 @@ INSERT INTO saved_script_tags (script_id, tag_id)
 VALUES ($1, $2)
 ON CONFLICT DO NOTHING;
 
+-- name: DeleteScriptTagsForScript :exec
+DELETE FROM saved_script_tags
+WHERE script_id = $1;
+
 -- name: ListTagsForScript :many
 SELECT t.*
 FROM script_tags t
