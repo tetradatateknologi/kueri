@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   isInDialog,
+  isInSqlEditor,
   isModKey,
   isTypingInFormField,
   shouldIgnoreWorkspaceHotkey,
@@ -25,6 +26,16 @@ describe("hotkeys", () => {
     document.body.appendChild(wrap);
     expect(isTypingInFormField(inner)).toBe(false);
     wrap.remove();
+  });
+
+  it("detects sql editor ancestry", () => {
+    const editor = document.createElement("div");
+    editor.className = "cm-editor";
+    const content = document.createElement("div");
+    content.className = "cm-content";
+    editor.appendChild(content);
+    expect(isInSqlEditor(content)).toBe(true);
+    expect(isInSqlEditor(document.body)).toBe(false);
   });
 
   it("detects dialog ancestry", () => {

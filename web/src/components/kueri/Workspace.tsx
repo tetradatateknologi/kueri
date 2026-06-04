@@ -404,7 +404,14 @@ export function Workspace() {
         <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0" id="kueri-editor-results">
           <ResizablePanel defaultSize={50} minSize={20}>
             {hasOpenTab ? (
-              <EditorPane value={draftSql} onChange={setDraftSql} onRun={runQuery} />
+              <EditorPane
+                value={draftSql}
+                onChange={setDraftSql}
+                onRun={runQuery}
+                onEditScript={() => {
+                  if (activeScriptId != null) openEditScript(activeScriptId);
+                }}
+              />
             ) : (
               <EditorEmptyState
                 favorites={favoriteScripts}

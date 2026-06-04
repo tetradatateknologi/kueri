@@ -22,7 +22,11 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { label: "Run query", keys: formatShortcut("Enter") },
       { label: "Save script", keys: formatShortcut("S") },
       { label: "Rename active script", keys: formatShortcut("F2") },
-      { label: "Edit script name & tags", keys: formatShortcut("S", { shift: true }) },
+      {
+        label: "Edit script name & tags",
+        keys: formatShortcut("E"),
+        description: "While the SQL editor is focused; also ⌘⇧S / Ctrl+Shift+S",
+      },
       {
         label: "Toggle favorite",
         keys: formatShortcut("B", { shift: true }),
@@ -39,7 +43,11 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
     items: [
       { label: "Toggle sidebar", keys: formatShortcut("B") },
       { label: "Focus sidebar search", keys: formatShortcut("F", { shift: true }) },
-      { label: "Cycle database connection", keys: formatShortcut("E") },
+      {
+        label: "Cycle database connection",
+        keys: formatShortcut("E"),
+        description: "When the SQL editor is not focused",
+      },
       { label: "Query history", keys: formatShortcut("H") },
       { label: "Switch to tab N", keys: `${formatShortcut("1")} … ${formatShortcut("9")}` },
       { label: "Next / previous tab", keys: `${formatShortcut("]")} / ${formatShortcut("[")}` },

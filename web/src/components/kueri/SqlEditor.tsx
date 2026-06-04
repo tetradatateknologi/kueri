@@ -17,17 +17,27 @@ type SqlEditorProps = {
   value: string;
   onChange: (value: string) => void;
   onRun?: () => void;
+  onEditScript?: () => void;
   readOnly?: boolean;
   className?: string;
 };
 
-export function SqlEditor({ value, onChange, onRun, readOnly = false, className }: SqlEditorProps) {
+export function SqlEditor({
+  value,
+  onChange,
+  onRun,
+  onEditScript,
+  readOnly = false,
+  className,
+}: SqlEditorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onRunRef = useRef(onRun);
   onRunRef.current = onRun;
+  const onEditScriptRef = useRef(onEditScript);
+  onEditScriptRef.current = onEditScript;
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -49,6 +59,13 @@ export function SqlEditor({ value, onChange, onRun, readOnly = false, className 
       {
         key: "Mod-/",
         run: toggleComment,
+      },
+      {
+        key: "Mod-e",
+        run: () => {
+          onEditScriptRef.current?.();
+          return true;
+        },
       },
     ]);
 

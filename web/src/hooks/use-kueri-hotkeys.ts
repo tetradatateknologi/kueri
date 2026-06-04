@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 
-import { isModKey, shouldIgnoreWorkspaceHotkey } from "@/lib/hotkeys";
+import { isInSqlEditor, isModKey, shouldIgnoreWorkspaceHotkey } from "@/lib/hotkeys";
 
 export type KueriHotkeyHandlers = {
   onRun: () => void;
@@ -92,7 +92,11 @@ export function useKueriHotkeys(handlers: KueriHotkeyHandlers) {
 
       if (key === "e") {
         e.preventDefault();
-        h.onCycleConnection();
+        if (isInSqlEditor(e.target)) {
+          h.onEditScript();
+        } else {
+          h.onCycleConnection();
+        }
         return;
       }
 

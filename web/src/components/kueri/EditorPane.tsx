@@ -7,14 +7,15 @@ type EditorPaneProps = {
   value: string;
   onChange: (value: string) => void;
   onRun?: () => void;
+  onEditScript?: () => void;
 };
 
-export function EditorPane({ value, onChange, onRun }: EditorPaneProps) {
+export function EditorPane({ value, onChange, onRun, onEditScript }: EditorPaneProps) {
   const isDocumentEmpty = value.trim() === "";
 
   return (
     <div className="relative h-full min-h-0">
-      <SqlEditor value={value} onChange={onChange} onRun={onRun} />
+      <SqlEditor value={value} onChange={onChange} onRun={onRun} onEditScript={onEditScript} />
       {isDocumentEmpty && (
         <WorkspaceEmptyState
           aria-hidden

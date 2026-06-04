@@ -34,12 +34,13 @@ Press `?` in the workspace or open **Settings** in the sidebar for the full guid
 | ⌘↵ / Ctrl+Enter | Run query |
 | ⌘S / Ctrl+S | Save script |
 | F2 | Rename active script |
-| ⌘⇧S / Ctrl+Shift+S | Edit script name & tags |
+| ⌘E / Ctrl+E (in SQL editor) | Edit script name & tags |
+| ⌘⇧S / Ctrl+Shift+S | Edit script name & tags (anywhere in workspace) |
 | ⌘⇧B / Ctrl+Shift+B | Toggle favorite on active script |
 | ⌘N / Ctrl+N | New script tab |
 | ⌘W / Ctrl+W | Close active tab |
 | ⌘H / Ctrl+H | Query history |
-| ⌘E / Ctrl+E | Cycle database connection |
+| ⌘E / Ctrl+E (outside editor) | Cycle database connection |
 | ⌘B / Ctrl+B | Toggle sidebar |
 | ⌘1–9 / Ctrl+1–9 | Switch to tab N |
 | ⌘/ / Ctrl+/ | Toggle SQL line comment (in editor) |
