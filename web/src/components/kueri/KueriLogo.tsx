@@ -36,7 +36,7 @@ export function KueriLogo({
   const sizing = sizeClasses[size];
 
   return (
-    <div className={cn("inline-flex items-center gap-2.5", className)}>
+    <div className={cn("inline-flex items-center gap-2.5 opacity-90", className)}>
       <div
         className={cn(
           "relative shrink-0 overflow-hidden flex items-center justify-center",

@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
   FileCode2,
-  Filter,
   FolderGit2,
   Plus,
   Search,
@@ -311,7 +310,6 @@ export function Sidebar() {
             />
           </div>
           <div className="flex items-center gap-1">
-            <Filter className="size-3 shrink-0 text-muted-foreground" aria-hidden />
             <ProjectFilterCombobox
               value={projectWorkspaceId}
               workspaces={workspaces}
