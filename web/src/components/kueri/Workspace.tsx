@@ -21,7 +21,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { useAppView } from "@/context/app-view";
 import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
 import { useKueriHotkeys } from "@/hooks/use-kueri-hotkeys";
@@ -76,7 +75,6 @@ export function Workspace() {
 
   const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const { openSettings } = useAppView();
 
   const openTabs = openScriptIds
     .map((id) => scripts.find((s) => s.id === id))
@@ -217,7 +215,6 @@ export function Workspace() {
         if (id != null) setActiveScriptId(id);
       },
       onResultsView: (view: "results" | "json") => setResultsView(view),
-      onShowShortcuts: () => openSettings("shortcuts"),
     }),
     [
       runQuery,
@@ -234,7 +231,6 @@ export function Workspace() {
       cycleConnection,
       setResultsView,
       handleSave,
-      openSettings,
     ],
   );
 
@@ -401,15 +397,6 @@ export function Workspace() {
               <span className="hidden lg:inline text-[10px] opacity-70 font-mono">
                 {formatShortcut("Enter")}
               </span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openSettings("shortcuts")}
-              className="size-8 shrink-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-1 text-xs font-mono"
-              aria-label="Settings and keyboard shortcuts"
-              title="Settings (?) — panduan & pintasan"
-            >
-              ?
             </button>
           </div>
         </div>

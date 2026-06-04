@@ -492,7 +492,6 @@ export function Sidebar() {
           >
             <Settings className="size-3.5 shrink-0" />
             <span className="flex-1 text-left">Settings</span>
-            <span className="text-[10px] font-mono opacity-60">?</span>
           </button>
         </SidebarFooter>
       </UiSidebar>

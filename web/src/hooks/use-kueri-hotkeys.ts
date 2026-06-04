@@ -18,7 +18,6 @@ export type KueriHotkeyHandlers = {
   onPrevTab: () => void;
   onSwitchTab: (index: number) => void;
   onResultsView: (view: "results" | "json") => void;
-  onShowShortcuts: () => void;
 };
 
 export function useKueriHotkeys(handlers: KueriHotkeyHandlers) {
@@ -28,12 +27,6 @@ export function useKueriHotkeys(handlers: KueriHotkeyHandlers) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const h = handlersRef.current;
-
-      if (e.key === "?" && !isModKey(e) && !e.altKey && !shouldIgnoreWorkspaceHotkey(e)) {
-        e.preventDefault();
-        h.onShowShortcuts();
-        return;
-      }
 
       if (shouldIgnoreWorkspaceHotkey(e)) return;
 

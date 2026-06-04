@@ -43,7 +43,6 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
       { label: "Query history", keys: formatShortcut("H") },
       { label: "Switch to tab N", keys: `${formatShortcut("1")} … ${formatShortcut("9")}` },
       { label: "Next / previous tab", keys: `${formatShortcut("]")} / ${formatShortcut("[")}` },
-      { label: "Open settings & guide", keys: "?" },
     ],
   },
   {
@@ -80,8 +79,7 @@ export const USAGE_GUIDE_SECTIONS = [
     id: "shortcuts",
     title: "Pintasan",
     body: [
-      "Tekan ? di workspace untuk membuka Settings pada bagian panduan ini.",
-      "Semua pintasan juga tersedia di menu Settings di sidebar.",
+      "Semua pintasan tersedia di menu Settings di sidebar, pada bagian Panduan & pintasan.",
     ],
   },
 ] as const;
