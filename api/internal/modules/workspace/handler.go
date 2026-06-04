@@ -49,6 +49,72 @@ func (h *Handler) Create(c echo.Context) error {
 	return apphttp.Created(c, ws)
 }
 
+func (h *Handler) Update(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	workspaceID, err := parseWorkspaceID(c)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid workspace ID")
+	}
+	var req UpdateWorkspaceRequest
+	if err := c.Bind(&req); err != nil {
+		return apphttp.BadRequest(c, "Invalid request body")
+	}
+	ws, err := h.svc.Update(c.Request().Context(), user.ID, workspaceID, req.Name)
+	if err != nil {
+		if errors.Is(err, ErrWorkspaceNotFound) {
+			return apphttp.NotFound(c, "Workspace not found")
+		}
+		if errors.Is(err, ErrInvalidInput) {
+			return apphttp.BadRequest(c, "Workspace name is required")
+		}
+		return apphttp.InternalError(c, "Failed to update workspace", err)
+	}
+	return apphttp.Success(c, ws)
+}
+
+func (h *Handler) Delete(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	workspaceID, err := parseWorkspaceID(c)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid workspace ID")
+	}
+	if err := h.svc.Delete(c.Request().Context(), user.ID, workspaceID); err != nil {
+		if errors.Is(err, ErrWorkspaceNotFound) {
+			return apphttp.NotFound(c, "Workspace not found")
+		}
+		return apphttp.InternalError(c, "Failed to delete workspace", err)
+	}
+	return apphttp.Success(c, DeleteResponse{Deleted: true})
+}
+
+func (h *Handler) DeleteConnection(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	workspaceID, err := parseWorkspaceID(c)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid workspace ID")
+	}
+	connectionID, err := strconv.ParseInt(c.Param("connectionId"), 10, 64)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid connection ID")
+	}
+	if err := h.svc.DeleteConnection(c.Request().Context(), user.ID, workspaceID, connectionID); err != nil {
+		if errors.Is(err, ErrWorkspaceNotFound) {
+			return apphttp.NotFound(c, "Connection not found")
+		}
+		return apphttp.InternalError(c, "Failed to delete connection", err)
+	}
+	return apphttp.Success(c, DeleteResponse{Deleted: true})
+}
+
 func (h *Handler) CreateConnection(c echo.Context) error {
 	user, ok := middleware.UserFromContext(c.Request().Context())
 	if !ok {

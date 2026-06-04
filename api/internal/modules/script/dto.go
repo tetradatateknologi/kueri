@@ -13,6 +13,10 @@ type ScriptResponse struct {
 	Tags        []TagResponse `json:"tags"`
 }
 
+type DeleteScriptResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
 type UpdateScriptRequest struct {
 	Title   *string `json:"title"`
 	SqlText *string `json:"sql_text"`

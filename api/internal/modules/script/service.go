@@ -100,6 +100,13 @@ func (s *Service) Create(ctx context.Context, userID int64, req CreateScriptRequ
 	return s.mapScript(ctx, created)
 }
 
+func (s *Service) Delete(ctx context.Context, userID, scriptID int64) error {
+	if _, err := s.GetByID(ctx, userID, scriptID); err != nil {
+		return err
+	}
+	return s.q.SoftDeleteSavedScript(ctx, scriptID)
+}
+
 func (s *Service) mapScript(ctx context.Context, sc sqlc.SavedScript) (ScriptResponse, error) {
 	tags, err := s.q.ListTagsForScript(ctx, sc.ID)
 	if err != nil {

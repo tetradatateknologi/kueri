@@ -18,6 +18,9 @@ func RegisterRoutes(g *echo.Group, pool *pgxpool.Pool, cfg *config.Config) {
 
 	g.GET("/workspaces", h.List)
 	g.POST("/workspaces", h.Create)
+	g.PATCH("/workspaces/:workspaceId", h.Update)
+	g.DELETE("/workspaces/:workspaceId", h.Delete)
 	g.POST("/workspaces/:workspaceId/connections", h.CreateConnection)
+	g.DELETE("/workspaces/:workspaceId/connections/:connectionId", h.DeleteConnection)
 	g.POST("/workspaces/:workspaceId/connections/test", h.TestConnection)
 }

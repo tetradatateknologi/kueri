@@ -72,6 +72,24 @@ func (h *Handler) Update(c echo.Context) error {
 	return apphttp.Success(c, script)
 }
 
+func (h *Handler) Delete(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid script ID")
+	}
+	if err := h.svc.Delete(c.Request().Context(), user.ID, id); err != nil {
+		if errors.Is(err, ErrScriptNotFound) {
+			return apphttp.NotFound(c, "Script not found")
+		}
+		return apphttp.InternalError(c, "Failed to delete script", err)
+	}
+	return apphttp.Success(c, DeleteScriptResponse{Deleted: true})
+}
+
 func (h *Handler) Create(c echo.Context) error {
 	user, ok := middleware.UserFromContext(c.Request().Context())
 	if !ok {

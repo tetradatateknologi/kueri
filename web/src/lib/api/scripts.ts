@@ -16,6 +16,12 @@ export function updateScript(id: number, body: { title?: string; sql_text?: stri
   });
 }
 
+export function deleteScript(id: number) {
+  return apiFetch<{ deleted: boolean }>(`/api/v1/scripts/${id}`, {
+    method: "DELETE",
+  });
+}
+
 export function createScript(body: { workspace_id: number; title: string; sql_text?: string }) {
   return apiFetch<Script>("/api/v1/scripts", {
     method: "POST",

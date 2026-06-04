@@ -4,6 +4,14 @@ type CreateWorkspaceRequest struct {
 	Name string `json:"name"`
 }
 
+type UpdateWorkspaceRequest struct {
+	Name string `json:"name"`
+}
+
+type DeleteResponse struct {
+	Deleted bool `json:"deleted"`
+}
+
 type ConnectionInput struct {
 	Name         string `json:"name"`
 	Environment  string `json:"environment"`

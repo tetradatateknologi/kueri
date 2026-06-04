@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -47,6 +48,72 @@ func (s *Service) ListForUser(ctx context.Context, userID int64) ([]WorkspaceRes
 		out = append(out, item)
 	}
 	return out, nil
+}
+
+func (s *Service) Update(ctx context.Context, userID, workspaceID int64, name string) (WorkspaceResponse, error) {
+	if err := authz.EnsureWorkspaceOwner(ctx, s.q, userID, workspaceID); err != nil {
+		if errors.Is(err, authz.ErrWorkspaceNotFound) {
+			return WorkspaceResponse{}, ErrWorkspaceNotFound
+		}
+		return WorkspaceResponse{}, err
+	}
+	name = trimName(name)
+	if name == "" {
+		return WorkspaceResponse{}, ErrInvalidInput
+	}
+	ws, err := s.q.UpdateWorkspaceName(ctx, sqlc.UpdateWorkspaceNameParams{
+		ID:   workspaceID,
+		Name: name,
+	})
+	if err != nil {
+		return WorkspaceResponse{}, err
+	}
+	conns, err := s.q.ListConnectionsByWorkspace(ctx, workspaceID)
+	if err != nil {
+		return WorkspaceResponse{}, err
+	}
+	item := WorkspaceResponse{
+		ID:          ws.ID,
+		Name:        ws.Name,
+		Connections: make([]ConnectionResponse, 0, len(conns)),
+	}
+	for _, c := range conns {
+		item.Connections = append(item.Connections, mapConnection(c))
+	}
+	return item, nil
+}
+
+func (s *Service) Delete(ctx context.Context, userID, workspaceID int64) error {
+	if err := authz.EnsureWorkspaceOwner(ctx, s.q, userID, workspaceID); err != nil {
+		if errors.Is(err, authz.ErrWorkspaceNotFound) {
+			return ErrWorkspaceNotFound
+		}
+		return err
+	}
+	return s.q.SoftDeleteWorkspace(ctx, workspaceID)
+}
+
+func (s *Service) DeleteConnection(ctx context.Context, userID, workspaceID, connectionID int64) error {
+	if err := authz.EnsureWorkspaceOwner(ctx, s.q, userID, workspaceID); err != nil {
+		if errors.Is(err, authz.ErrWorkspaceNotFound) {
+			return ErrWorkspaceNotFound
+		}
+		return err
+	}
+	conn, err := s.q.GetConnectionForUser(ctx, sqlc.GetConnectionForUserParams{
+		ID:     connectionID,
+		UserID: userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ErrWorkspaceNotFound
+		}
+		return err
+	}
+	if conn.WorkspaceID != workspaceID {
+		return ErrWorkspaceNotFound
+	}
+	return s.q.SoftDeleteConnection(ctx, connectionID)
 }
 
 func (s *Service) Create(ctx context.Context, userID int64, name string) (WorkspaceResponse, error) {
