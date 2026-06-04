@@ -2,10 +2,20 @@ import type { ConnectionDriver } from "@/lib/api/types";
 
 export const DRIVER_META: Record<
   ConnectionDriver,
-  { label: string; defaultPort: number; hint: string }
+  { label: string; defaultPort: number; hint: string; icon: string }
 > = {
-  postgres: { label: "PostgreSQL", defaultPort: 5433, hint: "Relational · ACID · JSON" },
-  mysql: { label: "MySQL", defaultPort: 3306, hint: "Relational · widely deployed" },
+  postgres: {
+    label: "PostgreSQL",
+    defaultPort: 5433,
+    hint: "Relational · ACID · JSON",
+    icon: "/db/postgresql.png",
+  },
+  mysql: {
+    label: "MySQL",
+    defaultPort: 3306,
+    hint: "Relational · widely deployed",
+    icon: "/db/mysql.png",
+  },
 };
 
 export type ConnectionEnvironment = "development" | "staging" | "production";

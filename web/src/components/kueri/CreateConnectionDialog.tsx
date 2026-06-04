@@ -298,7 +298,7 @@ export function CreateConnectionDialog({
                       onClick={() => setDriver(driver)}
                       className={cn(
                         isEdit && "cursor-default opacity-90",
-                        "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors",
+                        "flex items-center gap-3 rounded-lg border p-3 text-left transition-colors",
                         "hover:bg-surface-1 hover:border-border/80",
                         selected
                           ? "border-electric/50 bg-electric/5 ring-1 ring-electric/30"
