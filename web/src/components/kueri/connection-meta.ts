@@ -6,7 +6,7 @@ export const DRIVER_META: Record<
 > = {
   postgres: {
     label: "PostgreSQL",
-    defaultPort: 5433,
+    defaultPort: 5432,
     hint: "Relational · ACID · JSON",
     icon: "/db/postgresql.png",
   },

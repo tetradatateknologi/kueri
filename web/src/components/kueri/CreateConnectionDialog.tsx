@@ -59,7 +59,7 @@ const defaultsByDriver: Record<ConnectionDriver, ConnectionInput> = {
     ...sharedDefaults,
     name: ENV_META.development.label,
     driver: "postgres",
-    port: 5433,
+    port: 5432,
   },
   mysql: {
     ...sharedDefaults,
