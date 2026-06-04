@@ -29,14 +29,17 @@ type TestConnectionResponse struct {
 }
 
 type ConnectionResponse struct {
-	ID          int64  `json:"id"`
-	Name        string `json:"name"`
-	Environment string `json:"environment"`
-	EnvKey      string `json:"env_key"`
-	Host        string `json:"host"`
-	Port        int32  `json:"port"`
-	DisplayHost string `json:"display_host"`
-	Driver      string `json:"driver"`
+	ID           int64  `json:"id"`
+	Name         string `json:"name"`
+	Environment  string `json:"environment"`
+	EnvKey       string `json:"env_key"`
+	Host         string `json:"host"`
+	Port         int32  `json:"port"`
+	DisplayHost  string `json:"display_host"`
+	Driver       string `json:"driver"`
+	DatabaseName string `json:"database_name"`
+	Username     string `json:"username"`
+	SSLMode      string `json:"ssl_mode"`
 }
 
 type WorkspaceResponse struct {

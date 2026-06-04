@@ -6,7 +6,18 @@ import (
 	"github.com/tetradatateknologi/kueri/api/db/sqlc"
 )
 
-func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, error) {
+type parsedConnectionFields struct {
+	Name         string
+	Environment  sqlc.ConnectionEnvironment
+	Driver       sqlc.ConnectionDriver
+	Host         string
+	Port         int32
+	DatabaseName string
+	Username     *string
+	SslMode      string
+}
+
+func parseConnectionFields(in ConnectionInput) (parsedConnectionFields, error) {
 	name := strings.TrimSpace(in.Name)
 	host := strings.TrimSpace(in.Host)
 	dbName := strings.TrimSpace(in.DatabaseName)
@@ -15,20 +26,20 @@ func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, erro
 	driver := strings.TrimSpace(in.Driver)
 
 	if name == "" || host == "" || dbName == "" {
-		return sqlc.CreateConnectionParams{}, ErrInvalidInput
+		return parsedConnectionFields{}, ErrInvalidInput
 	}
 	if in.Port <= 0 {
-		return sqlc.CreateConnectionParams{}, ErrInvalidInput
+		return parsedConnectionFields{}, ErrInvalidInput
 	}
 
 	env, err := parseEnvironment(in.Environment)
 	if err != nil {
-		return sqlc.CreateConnectionParams{}, err
+		return parsedConnectionFields{}, err
 	}
 
 	connDriver, err := parseDriver(driver)
 	if err != nil {
-		return sqlc.CreateConnectionParams{}, err
+		return parsedConnectionFields{}, err
 	}
 	if sslMode == "" {
 		sslMode = "disable"
@@ -39,7 +50,7 @@ func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, erro
 		userPtr = &username
 	}
 
-	return sqlc.CreateConnectionParams{
+	return parsedConnectionFields{
 		Name:         name,
 		Environment:  env,
 		Driver:       connDriver,
@@ -48,6 +59,23 @@ func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, erro
 		DatabaseName: dbName,
 		Username:     userPtr,
 		SslMode:      sslMode,
+	}, nil
+}
+
+func parseConnectionInput(in ConnectionInput) (sqlc.CreateConnectionParams, error) {
+	fields, err := parseConnectionFields(in)
+	if err != nil {
+		return sqlc.CreateConnectionParams{}, err
+	}
+	return sqlc.CreateConnectionParams{
+		Name:         fields.Name,
+		Environment:  fields.Environment,
+		Driver:       fields.Driver,
+		Host:         fields.Host,
+		Port:         fields.Port,
+		DatabaseName: fields.DatabaseName,
+		Username:     fields.Username,
+		SslMode:      fields.SslMode,
 	}, nil
 }
 

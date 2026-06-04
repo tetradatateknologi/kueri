@@ -30,7 +30,7 @@ import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
 import { ApiError } from "@/lib/api/http";
 import { deleteScript } from "@/lib/api/scripts";
-import type { Script } from "@/lib/api/types";
+import type { Connection, Script } from "@/lib/api/types";
 import {
   deleteConnection,
   deleteWorkspace,
@@ -98,6 +98,11 @@ export function Sidebar() {
   const [connectionDialog, setConnectionDialog] = useState<{
     workspaceId: number;
     workspaceName: string;
+  } | null>(null);
+  const [editConnectionDialog, setEditConnectionDialog] = useState<{
+    workspaceId: number;
+    workspaceName: string;
+    connection: Connection;
   } | null>(null);
   const [renameTarget, setRenameTarget] = useState<RenameTarget | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
@@ -370,6 +375,13 @@ export function Sidebar() {
                                   </span>
                                 </button>
                                 <SidebarItemMenu
+                                  onEdit={() =>
+                                    setEditConnectionDialog({
+                                      workspaceId: ws.id,
+                                      workspaceName: ws.name,
+                                      connection: c,
+                                    })
+                                  }
                                   onDelete={() =>
                                     setDeleteTarget({
                                       kind: "connection",
@@ -491,6 +503,31 @@ export function Sidebar() {
           existingConnections={
             workspaces.find((ws) => ws.id === connectionDialog.workspaceId)?.connections ?? []
           }
+        />
+      )}
+      {editConnectionDialog && (
+        <CreateConnectionDialog
+          open
+          mode="edit"
+          connection={editConnectionDialog.connection}
+          onOpenChange={(open) => {
+            if (!open) setEditConnectionDialog(null);
+          }}
+          workspaceId={editConnectionDialog.workspaceId}
+          workspaceName={editConnectionDialog.workspaceName}
+          existingConnections={
+            workspaces.find((ws) => ws.id === editConnectionDialog.workspaceId)?.connections ?? []
+          }
+          onUpdated={(conn) => {
+            if (selectedConnection?.connectionId === conn.id) {
+              setSelectedConnection({
+                ...selectedConnection,
+                label: conn.name,
+                host: conn.display_host,
+                env: conn.env_key,
+              });
+            }
+          }}
         />
       )}
       {renameTarget && (

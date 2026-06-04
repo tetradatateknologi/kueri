@@ -194,3 +194,70 @@ func (q *Queries) SoftDeleteConnection(ctx context.Context, id int64) error {
 	_, err := q.db.Exec(ctx, softDeleteConnection, id)
 	return err
 }
+
+const updateConnection = `-- name: UpdateConnection :one
+UPDATE connections
+SET
+    name = $2,
+    environment = $3,
+    driver = $4,
+    host = $5,
+    port = $6,
+    database_name = $7,
+    username = $8,
+    password_encrypted = COALESCE($9, password_encrypted),
+    ssl_mode = $10,
+    updated_at = NOW()
+WHERE id = $1
+  AND workspace_id = $11
+  AND deleted_at IS NULL
+RETURNING id, workspace_id, name, environment, driver, host, port, database_name, username, password_encrypted, ssl_mode, created_at, updated_at, deleted_at
+`
+
+type UpdateConnectionParams struct {
+	ID                int64                 `json:"id"`
+	Name              string                `json:"name"`
+	Environment       ConnectionEnvironment `json:"environment"`
+	Driver            ConnectionDriver      `json:"driver"`
+	Host              string                `json:"host"`
+	Port              int32                 `json:"port"`
+	DatabaseName      string                `json:"database_name"`
+	Username          *string               `json:"username"`
+	PasswordEncrypted *string               `json:"password_encrypted"`
+	SslMode           string                `json:"ssl_mode"`
+	WorkspaceID       int64                 `json:"workspace_id"`
+}
+
+func (q *Queries) UpdateConnection(ctx context.Context, arg UpdateConnectionParams) (Connection, error) {
+	row := q.db.QueryRow(ctx, updateConnection,
+		arg.ID,
+		arg.Name,
+		arg.Environment,
+		arg.Driver,
+		arg.Host,
+		arg.Port,
+		arg.DatabaseName,
+		arg.Username,
+		arg.PasswordEncrypted,
+		arg.SslMode,
+		arg.WorkspaceID,
+	)
+	var i Connection
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Environment,
+		&i.Driver,
+		&i.Host,
+		&i.Port,
+		&i.DatabaseName,
+		&i.Username,
+		&i.PasswordEncrypted,
+		&i.SslMode,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}

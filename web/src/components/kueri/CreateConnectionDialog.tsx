@@ -30,16 +30,19 @@ import {
 } from "@/components/ui/select";
 import { ApiError } from "@/lib/api/http";
 import type { Connection, ConnectionDriver, ConnectionInput } from "@/lib/api/types";
-import { createConnection, testConnection } from "@/lib/api/workspaces";
+import { createConnection, testConnection, updateConnection } from "@/lib/api/workspaces";
 import { showSuccess, showValidationError } from "@/lib/toasts";
 import { cn } from "@/lib/utils";
 
-type CreateConnectionDialogProps = {
+type ConnectionDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   workspaceId: number;
   workspaceName: string;
   existingConnections?: Connection[];
+  mode?: "create" | "edit";
+  connection?: Connection;
+  onUpdated?: (conn: Connection) => void;
 };
 
 const sharedDefaults = {
@@ -72,13 +75,44 @@ function isKnownEnvironment(value: string): value is ConnectionEnvironment {
   return value in ENV_META;
 }
 
+function isCustomConnectionName(conn: Connection): boolean {
+  const env = conn.environment as ConnectionEnvironment;
+  if (!(env in ENV_META)) return true;
+  return conn.name !== ENV_META[env].label;
+}
+
+function connectionToInitialState(conn: Connection) {
+  const env = isKnownEnvironment(conn.environment) ? conn.environment : "development";
+  const driver: ConnectionDriver = conn.driver === "mysql" ? "mysql" : "postgres";
+  const customName = isCustomConnectionName(conn);
+  return {
+    form: {
+      name: conn.name,
+      environment: env,
+      driver,
+      host: conn.host,
+      port: conn.port,
+      database_name: conn.database_name,
+      username: conn.username,
+      password: "",
+      ssl_mode: conn.ssl_mode || ENV_META[env].sslDefault,
+    } satisfies ConnectionInput,
+    customName,
+    customNameValue: customName ? conn.name : "",
+  };
+}
+
 export function CreateConnectionDialog({
   open,
   onOpenChange,
   workspaceId,
   workspaceName,
   existingConnections = [],
-}: CreateConnectionDialogProps) {
+  mode = "create",
+  connection,
+  onUpdated,
+}: ConnectionDialogProps) {
+  const isEdit = mode === "edit";
   const [form, setForm] = useState<ConnectionInput>(defaultsByDriver.postgres);
   const [customName, setCustomName] = useState(false);
   const [customNameValue, setCustomNameValue] = useState("");
@@ -97,8 +131,19 @@ export function CreateConnectionDialog({
   };
 
   useEffect(() => {
-    if (open) resetForm();
-  }, [open]);
+    if (!open) return;
+    if (isEdit && connection) {
+      const initial = connectionToInitialState(connection);
+      setForm(initial.form);
+      setCustomName(initial.customName);
+      setCustomNameValue(initial.customNameValue);
+      setShowPassword(false);
+      setAdvancedOpen(false);
+      setTestStatus(null);
+      return;
+    }
+    resetForm();
+  }, [open, isEdit, connection]);
 
   const patch = (partial: Partial<ConnectionInput>) => {
     setTestStatus(null);
@@ -111,12 +156,13 @@ export function CreateConnectionDialog({
     if (!resolvedName) return null;
     const clash = existingConnections.find(
       (c) =>
+        c.id !== connection?.id &&
         c.name.toLowerCase() === resolvedName.toLowerCase() &&
         c.environment.toLowerCase() === form.environment.toLowerCase(),
     );
     if (!clash) return null;
     return `A connection named "${clash.name}" already exists in ${envLabel(form.environment)}.`;
-  }, [existingConnections, form.environment, resolvedName]);
+  }, [connection?.id, existingConnections, form.environment, resolvedName]);
 
   const setDriver = (driver: ConnectionDriver) => {
     setTestStatus(null);
@@ -169,11 +215,22 @@ export function CreateConnectionDialog({
     },
   });
 
-  const createMutation = useMutation({
-    mutationFn: () => createConnection(workspaceId, body()),
+  const saveMutation = useMutation({
+    mutationFn: () => {
+      const payload = body();
+      if (isEdit && connection) {
+        return updateConnection(workspaceId, connection.id, payload);
+      }
+      return createConnection(workspaceId, payload);
+    },
     onSuccess: async (conn) => {
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
-      showSuccess(`Connection "${conn.name}" created`);
+      if (isEdit) {
+        showSuccess(`Connection "${conn.name}" updated`);
+        onUpdated?.(conn);
+      } else {
+        showSuccess(`Connection "${conn.name}" created`);
+      }
       onOpenChange(false);
     },
     onError: (err) => {
@@ -182,7 +239,9 @@ export function CreateConnectionDialog({
           ? err.message
           : err instanceof Error
             ? err.message
-            : "Failed to create connection";
+            : isEdit
+              ? "Failed to update connection"
+              : "Failed to create connection";
       showValidationError(message);
     },
   });
@@ -205,10 +264,10 @@ export function CreateConnectionDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (validate()) createMutation.mutate();
+    if (validate()) saveMutation.mutate();
   };
 
-  const busy = testMutation.isPending || createMutation.isPending;
+  const busy = testMutation.isPending || saveMutation.isPending;
   const driverLabel = DRIVER_META[form.driver].label;
   const currentEnv = isKnownEnvironment(form.environment) ? form.environment : "development";
 
@@ -217,9 +276,9 @@ export function CreateConnectionDialog({
       <DialogContent className="sm:max-w-lg max-h-[90vh] overflow-y-auto">
         <form onSubmit={handleSubmit}>
           <DialogHeader>
-            <DialogTitle>New connection</DialogTitle>
+            <DialogTitle>{isEdit ? "Edit connection" : "New connection"}</DialogTitle>
             <DialogDescription>
-              Add a {driverLabel} connection to{" "}
+              {isEdit ? "Update" : "Add"} a {driverLabel} connection in{" "}
               <span className="font-mono text-foreground">{workspaceName}</span>.
             </DialogDescription>
           </DialogHeader>
@@ -235,8 +294,10 @@ export function CreateConnectionDialog({
                     <button
                       key={driver}
                       type="button"
+                      disabled={isEdit}
                       onClick={() => setDriver(driver)}
                       className={cn(
+                        isEdit && "cursor-default opacity-90",
                         "flex items-start gap-2.5 rounded-lg border p-3 text-left transition-colors",
                         "hover:bg-surface-1 hover:border-border/80",
                         selected
@@ -379,12 +440,18 @@ export function CreateConnectionDialog({
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Password</Label>
+                {isEdit && (
+                  <p className="text-[10px] text-muted-foreground mt-0.5">
+                    Leave blank to keep the current password.
+                  </p>
+                )}
                 <div className="relative mt-1">
                   <Input
                     className="font-mono text-sm pr-9"
                     type={showPassword ? "text" : "password"}
                     value={form.password}
                     onChange={(e) => patch({ password: e.target.value })}
+                    placeholder={isEdit ? "Unchanged" : undefined}
                   />
                   <button
                     type="button"
@@ -478,11 +545,13 @@ export function CreateConnectionDialog({
               )}
             </Button>
             <Button type="submit" size="sm" disabled={busy || !!duplicateWarning}>
-              {createMutation.isPending ? (
+              {saveMutation.isPending ? (
                 <>
                   <Loader2 className="size-3.5 mr-1.5 animate-spin" />
                   Saving…
                 </>
+              ) : isEdit ? (
+                "Save changes"
               ) : (
                 "Save"
               )}

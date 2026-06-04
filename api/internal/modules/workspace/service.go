@@ -116,6 +116,70 @@ func (s *Service) DeleteConnection(ctx context.Context, userID, workspaceID, con
 	return s.q.SoftDeleteConnection(ctx, connectionID)
 }
 
+func (s *Service) UpdateConnection(
+	ctx context.Context,
+	userID, workspaceID, connectionID int64,
+	in ConnectionInput,
+) (ConnectionResponse, error) {
+	if err := authz.EnsureWorkspaceOwner(ctx, s.q, userID, workspaceID); err != nil {
+		if errors.Is(err, authz.ErrWorkspaceNotFound) {
+			return ConnectionResponse{}, ErrWorkspaceNotFound
+		}
+		return ConnectionResponse{}, err
+	}
+
+	existing, err := s.q.GetConnectionForUser(ctx, sqlc.GetConnectionForUserParams{
+		ID:     connectionID,
+		UserID: userID,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ConnectionResponse{}, ErrWorkspaceNotFound
+		}
+		return ConnectionResponse{}, err
+	}
+	if existing.WorkspaceID != workspaceID {
+		return ConnectionResponse{}, ErrWorkspaceNotFound
+	}
+
+	fields, err := parseConnectionFields(in)
+	if err != nil {
+		return ConnectionResponse{}, err
+	}
+
+	var passwordEncrypted *string
+	if strings.TrimSpace(in.Password) != "" {
+		encrypted, err := s.box.Encrypt(in.Password)
+		if err != nil {
+			return ConnectionResponse{}, err
+		}
+		if encrypted != "" {
+			passwordEncrypted = &encrypted
+		}
+	}
+
+	updated, err := s.q.UpdateConnection(ctx, sqlc.UpdateConnectionParams{
+		ID:                connectionID,
+		Name:              fields.Name,
+		Environment:       fields.Environment,
+		Driver:            fields.Driver,
+		Host:              fields.Host,
+		Port:              fields.Port,
+		DatabaseName:      fields.DatabaseName,
+		Username:          fields.Username,
+		PasswordEncrypted: passwordEncrypted,
+		SslMode:           fields.SslMode,
+		WorkspaceID:       workspaceID,
+	})
+	if err != nil {
+		if isUniqueViolation(err) {
+			return ConnectionResponse{}, ErrConnectionConflict
+		}
+		return ConnectionResponse{}, err
+	}
+	return mapConnection(updated), nil
+}
+
 func (s *Service) Create(ctx context.Context, userID int64, name string) (WorkspaceResponse, error) {
 	name = trimName(name)
 	if name == "" {
@@ -205,15 +269,22 @@ func isUniqueViolation(err error) bool {
 }
 
 func mapConnection(c sqlc.Connection) ConnectionResponse {
+	username := ""
+	if c.Username != nil {
+		username = *c.Username
+	}
 	return ConnectionResponse{
-		ID:          c.ID,
-		Name:        c.Name,
-		Environment: string(c.Environment),
-		EnvKey:      envKey(c.Environment),
-		Host:        c.Host,
-		Port:        c.Port,
-		DisplayHost: fmt.Sprintf("%s:%d", c.Host, c.Port),
-		Driver:      string(c.Driver),
+		ID:           c.ID,
+		Name:         c.Name,
+		Environment:  string(c.Environment),
+		EnvKey:       envKey(c.Environment),
+		Host:         c.Host,
+		Port:         c.Port,
+		DisplayHost:  fmt.Sprintf("%s:%d", c.Host, c.Port),
+		Driver:       string(c.Driver),
+		DatabaseName: c.DatabaseName,
+		Username:     username,
+		SSLMode:      c.SslMode,
 	}
 }
 

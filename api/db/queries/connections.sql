@@ -37,6 +37,24 @@ WHERE workspace_id = $1
   AND deleted_at IS NULL
 ORDER BY environment, name;
 
+-- name: UpdateConnection :one
+UPDATE connections
+SET
+    name = $2,
+    environment = $3,
+    driver = $4,
+    host = $5,
+    port = $6,
+    database_name = $7,
+    username = $8,
+    password_encrypted = COALESCE($9, password_encrypted),
+    ssl_mode = $10,
+    updated_at = NOW()
+WHERE id = $1
+  AND workspace_id = $11
+  AND deleted_at IS NULL
+RETURNING *;
+
 -- name: SoftDeleteConnection :exec
 UPDATE connections
 SET deleted_at = NOW(),

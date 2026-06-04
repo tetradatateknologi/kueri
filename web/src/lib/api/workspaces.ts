@@ -32,6 +32,20 @@ export function createConnection(workspaceId: number, body: ConnectionInput) {
   });
 }
 
+export function updateConnection(
+  workspaceId: number,
+  connectionId: number,
+  body: ConnectionInput,
+) {
+  return apiFetch<Connection>(
+    `/api/v1/workspaces/${workspaceId}/connections/${connectionId}`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(body),
+    },
+  );
+}
+
 export function deleteConnection(workspaceId: number, connectionId: number) {
   return apiFetch<{ deleted: boolean }>(
     `/api/v1/workspaces/${workspaceId}/connections/${connectionId}`,

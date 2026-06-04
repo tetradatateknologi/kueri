@@ -115,6 +115,30 @@ func (h *Handler) DeleteConnection(c echo.Context) error {
 	return apphttp.Success(c, DeleteResponse{Deleted: true})
 }
 
+func (h *Handler) UpdateConnection(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	workspaceID, err := parseWorkspaceID(c)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid workspace ID")
+	}
+	connectionID, err := strconv.ParseInt(c.Param("connectionId"), 10, 64)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid connection ID")
+	}
+	var req ConnectionInput
+	if err := c.Bind(&req); err != nil {
+		return apphttp.BadRequest(c, "Invalid request body")
+	}
+	conn, err := h.svc.UpdateConnection(c.Request().Context(), user.ID, workspaceID, connectionID, req)
+	if err != nil {
+		return connectionError(c, err, "Failed to update connection")
+	}
+	return apphttp.Success(c, conn)
+}
+
 func (h *Handler) CreateConnection(c echo.Context) error {
 	user, ok := middleware.UserFromContext(c.Request().Context())
 	if !ok {

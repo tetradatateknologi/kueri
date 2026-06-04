@@ -16,6 +16,9 @@ export type Connection = {
   port: number;
   display_host: string;
   driver: string;
+  database_name: string;
+  username: string;
+  ssl_mode: string;
 };
 
 export type Workspace = {

@@ -112,4 +112,37 @@ func TestWorkspaceConnectionAndQuery(t *testing.T) {
 	if qEnvelope.Data.RowCount < 1 {
 		t.Fatalf("expected rows, got %d", qEnvelope.Data.RowCount)
 	}
+
+	// Update connection host label (name change)
+	patchBody := `{
+		"name": "Integration Dev Updated",
+		"environment": "development",
+		"driver": "postgres",
+		"host": "` + cfg.DB.Host + `",
+		"port": ` + strconv.Itoa(cfg.DB.Port) + `,
+		"database_name": "` + cfg.DB.Name + `",
+		"username": "` + cfg.DB.User + `",
+		"password": "",
+		"ssl_mode": "` + cfg.DB.SSLMode + `"
+	}`
+	patchRec := httptest.NewRecorder()
+	patchURL := connURL + "/" + strconv.FormatInt(connEnvelope.Data.ID, 10)
+	patchReq := httptest.NewRequest(http.MethodPatch, patchURL, bytes.NewBufferString(patchBody))
+	patchReq.Header.Set(echo.HeaderContentType, echo.MIMEApplicationJSON)
+	e.ServeHTTP(patchRec, patchReq)
+	if patchRec.Code != http.StatusOK {
+		t.Fatalf("update connection: %d %s", patchRec.Code, patchRec.Body.String())
+	}
+
+	var patchEnvelope struct {
+		Data struct {
+			Name string `json:"name"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(patchRec.Body.Bytes(), &patchEnvelope); err != nil {
+		t.Fatal(err)
+	}
+	if patchEnvelope.Data.Name != "Integration Dev Updated" {
+		t.Fatalf("expected updated name, got %q", patchEnvelope.Data.Name)
+	}
 }
