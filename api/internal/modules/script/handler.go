@@ -94,18 +94,3 @@ func (h *Handler) Create(c echo.Context) error {
 	return apphttp.Created(c, script)
 }
 
-func (h *Handler) Run(c echo.Context) error {
-	user, ok := middleware.UserFromContext(c.Request().Context())
-	if !ok {
-		return apphttp.NotFound(c, "User not found")
-	}
-	var req RunQueryRequest
-	if err := c.Bind(&req); err != nil {
-		return apphttp.BadRequest(c, "Invalid request body")
-	}
-	if req.SqlText == "" {
-		return apphttp.BadRequest(c, "sql_text is required")
-	}
-	result := h.svc.RunQuery(c.Request().Context(), user.ID, req.SqlText)
-	return apphttp.Success(c, result)
-}

@@ -1,6 +1,8 @@
 package config
 
 import (
+	"encoding/base64"
+	"fmt"
 	"os"
 	"strconv"
 	"strings"
@@ -9,10 +11,15 @@ import (
 )
 
 type Config struct {
-	App  AppConfig
-	DB   DBConfig
-	Dev  DevConfig
-	CORS CORSConfig
+	App        AppConfig
+	DB         DBConfig
+	Dev        DevConfig
+	CORS       CORSConfig
+	Encryption EncryptionConfig
+}
+
+type EncryptionConfig struct {
+	Key []byte
 }
 
 type DevConfig struct {
@@ -126,5 +133,29 @@ func Load() (*Config, error) {
 		}
 	}
 
+	key, err := loadEncryptionKey(cfg.App.Env)
+	if err != nil {
+		return nil, err
+	}
+	cfg.Encryption.Key = key
+
 	return cfg, nil
+}
+
+func loadEncryptionKey(appEnv string) ([]byte, error) {
+	raw := strings.TrimSpace(os.Getenv("APP_ENCRYPTION_KEY"))
+	if raw == "" {
+		if appEnv == "development" {
+			// Fixed dev key so local seed + connections work without extra setup.
+			return []byte("kueri-dev-encryption-key-32b!!!!"), nil
+		}
+		return nil, fmt.Errorf("APP_ENCRYPTION_KEY is required (32-byte value, base64 or raw)")
+	}
+	if decoded, err := base64.StdEncoding.DecodeString(raw); err == nil && len(decoded) == 32 {
+		return decoded, nil
+	}
+	if len(raw) == 32 {
+		return []byte(raw), nil
+	}
+	return nil, fmt.Errorf("APP_ENCRYPTION_KEY must be 32 bytes (raw) or base64-encoded 32 bytes")
 }

@@ -102,6 +102,43 @@ func (q *Queries) GetConnectionByID(ctx context.Context, id int64) (Connection, 
 	return i, err
 }
 
+const getConnectionForUser = `-- name: GetConnectionForUser :one
+SELECT c.id, c.workspace_id, c.name, c.environment, c.driver, c.host, c.port, c.database_name, c.username, c.password_encrypted, c.ssl_mode, c.created_at, c.updated_at, c.deleted_at
+FROM connections c
+INNER JOIN workspaces w ON w.id = c.workspace_id
+WHERE c.id = $1
+  AND w.user_id = $2
+  AND c.deleted_at IS NULL
+  AND w.deleted_at IS NULL
+`
+
+type GetConnectionForUserParams struct {
+	ID     int64 `json:"id"`
+	UserID int64 `json:"user_id"`
+}
+
+func (q *Queries) GetConnectionForUser(ctx context.Context, arg GetConnectionForUserParams) (Connection, error) {
+	row := q.db.QueryRow(ctx, getConnectionForUser, arg.ID, arg.UserID)
+	var i Connection
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.Name,
+		&i.Environment,
+		&i.Driver,
+		&i.Host,
+		&i.Port,
+		&i.DatabaseName,
+		&i.Username,
+		&i.PasswordEncrypted,
+		&i.SslMode,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+	)
+	return i, err
+}
+
 const listConnectionsByWorkspace = `-- name: ListConnectionsByWorkspace :many
 SELECT id, workspace_id, name, environment, driver, host, port, database_name, username, password_encrypted, ssl_mode, created_at, updated_at, deleted_at
 FROM connections

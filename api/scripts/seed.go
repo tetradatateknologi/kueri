@@ -9,6 +9,7 @@ import (
 	"github.com/tetradatateknologi/kueri/api/db/sqlc"
 	"github.com/tetradatateknologi/kueri/api/internal/config"
 	"github.com/tetradatateknologi/kueri/api/internal/persistence"
+	"github.com/tetradatateknologi/kueri/api/internal/secrets"
 )
 
 func main() {
@@ -53,27 +54,51 @@ func main() {
 		os.Exit(1)
 	}
 
+	box, err := secrets.NewBox(cfg.Encryption.Key)
+	if err != nil {
+		slog.Error("encryption", "error", err)
+		os.Exit(1)
+	}
+
+	devPassword, err := box.Encrypt(cfg.DB.Password)
+	if err != nil {
+		slog.Error("encrypt dev password", "error", err)
+		os.Exit(1)
+	}
+
 	for _, c := range []struct {
-		name string
-		env  sqlc.ConnectionEnvironment
-		host string
-		port int32
+		name         string
+		env          sqlc.ConnectionEnvironment
+		host         string
+		port         int32
+		databaseName string
+		username     string
+		passwordEnc  *string
 	}{
-		{"Development", sqlc.ConnectionEnvironmentDevelopment, "localhost", 5432},
-		{"Staging", sqlc.ConnectionEnvironmentStaging, "staging.db.internal", 5432},
-		{"Production", sqlc.ConnectionEnvironmentProduction, "prod-cluster.aws", 5432},
+		{
+			"Development",
+			sqlc.ConnectionEnvironmentDevelopment,
+			cfg.DB.Host,
+			int32(cfg.DB.Port),
+			cfg.DB.Name,
+			cfg.DB.User,
+			&devPassword,
+		},
+		{"Staging", sqlc.ConnectionEnvironmentStaging, "staging.db.internal", 5432, "app", "app", nil},
+		{"Production", sqlc.ConnectionEnvironmentProduction, "prod-cluster.aws", 5432, "app", "app", nil},
 	} {
-		username := "app"
+		username := c.username
 		if _, err := q.CreateConnection(ctx, sqlc.CreateConnectionParams{
-			WorkspaceID:  ws.ID,
-			Name:         c.name,
-			Environment:  c.env,
-			Driver:       sqlc.ConnectionDriverPostgres,
-			Host:         c.host,
-			Port:         c.port,
-			DatabaseName: "app",
-			Username:     &username,
-			SslMode:      "disable",
+			WorkspaceID:       ws.ID,
+			Name:              c.name,
+			Environment:       c.env,
+			Driver:            sqlc.ConnectionDriverPostgres,
+			Host:              c.host,
+			Port:              c.port,
+			DatabaseName:      c.databaseName,
+			Username:          &username,
+			PasswordEncrypted: c.passwordEnc,
+			SslMode:           cfg.DB.SSLMode,
 		}); err != nil {
 			slog.Error("create connection", "name", c.name, "error", err)
 			os.Exit(1)

@@ -1,5 +1,5 @@
 import { apiFetch } from "./http";
-import type { QueryRunResult, Script } from "./types";
+import type { Script } from "./types";
 
 export function listScripts() {
   return apiFetch<Script[]>("/api/v1/scripts");
@@ -23,9 +23,3 @@ export function createScript(body: { workspace_id: number; title: string; sql_te
   });
 }
 
-export function runQuery(sql_text: string) {
-  return apiFetch<QueryRunResult>("/api/v1/query/run", {
-    method: "POST",
-    body: JSON.stringify({ sql_text }),
-  });
-}

@@ -7,6 +7,7 @@ export type WorkspaceEnv = "Development" | "Staging" | "Production";
 export type ResultsView = "results" | "json";
 
 export type SelectedConnection = {
+  connectionId: number;
   projectId: string;
   projectName: string;
   env: "dev" | "staging" | "prod";

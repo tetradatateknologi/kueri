@@ -9,6 +9,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/tetradatateknologi/kueri/api/db/sqlc"
+	"github.com/tetradatateknologi/kueri/api/internal/authz"
 )
 
 var ErrScriptNotFound = errors.New("script not found")
@@ -99,25 +100,6 @@ func (s *Service) Create(ctx context.Context, userID int64, req CreateScriptRequ
 	return s.mapScript(ctx, created)
 }
 
-func (s *Service) RunQuery(_ context.Context, _ int64, sqlText string) RunQueryResponse {
-	_ = sqlText
-	return RunQueryResponse{
-		RowCount:   8,
-		DurationMs: 42,
-		Columns:    []string{"channel", "month", "revenue", "orders"},
-		Rows: []map[string]interface{}{
-			{"channel": "web", "month": "2026-05-01", "revenue": 12450.0, "orders": 182},
-			{"channel": "web", "month": "2026-04-01", "revenue": 11820.0, "orders": 171},
-			{"channel": "mobile", "month": "2026-05-01", "revenue": 9320.0, "orders": 144},
-			{"channel": "mobile", "month": "2026-04-01", "revenue": 8875.0, "orders": 138},
-			{"channel": "partner", "month": "2026-05-01", "revenue": 6210.0, "orders": 52},
-			{"channel": "partner", "month": "2026-04-01", "revenue": 5980.0, "orders": 49},
-			{"channel": "retail", "month": "2026-05-01", "revenue": 4100.0, "orders": 31},
-			{"channel": "retail", "month": "2026-04-01", "revenue": 3950.0, "orders": 28},
-		},
-	}
-}
-
 func (s *Service) mapScript(ctx context.Context, sc sqlc.SavedScript) (ScriptResponse, error) {
 	tags, err := s.q.ListTagsForScript(ctx, sc.ID)
 	if err != nil {
@@ -141,15 +123,11 @@ func (s *Service) ensureScriptOwner(ctx context.Context, userID, workspaceID int
 }
 
 func (s *Service) ensureWorkspaceOwner(ctx context.Context, userID, workspaceID int64) error {
-	ws, err := s.q.GetWorkspaceByID(ctx, workspaceID)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
+	if err := authz.EnsureWorkspaceOwner(ctx, s.q, userID, workspaceID); err != nil {
+		if errors.Is(err, authz.ErrWorkspaceNotFound) {
 			return ErrScriptNotFound
 		}
 		return err
-	}
-	if ws.UserID != userID {
-		return ErrScriptNotFound
 	}
 	return nil
 }

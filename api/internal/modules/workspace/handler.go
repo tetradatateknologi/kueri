@@ -1,6 +1,9 @@
 package workspace
 
 import (
+	"errors"
+	"strconv"
+
 	"github.com/labstack/echo/v4"
 
 	apphttp "github.com/tetradatateknologi/kueri/api/internal/http"
@@ -25,4 +28,85 @@ func (h *Handler) List(c echo.Context) error {
 		return apphttp.InternalError(c, "Failed to list workspaces", err)
 	}
 	return apphttp.Success(c, workspaces)
+}
+
+func (h *Handler) Create(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	var req CreateWorkspaceRequest
+	if err := c.Bind(&req); err != nil {
+		return apphttp.BadRequest(c, "Invalid request body")
+	}
+	ws, err := h.svc.Create(c.Request().Context(), user.ID, req.Name)
+	if err != nil {
+		if errors.Is(err, ErrInvalidInput) {
+			return apphttp.BadRequest(c, "Workspace name is required")
+		}
+		return apphttp.InternalError(c, "Failed to create workspace", err)
+	}
+	return apphttp.Created(c, ws)
+}
+
+func (h *Handler) CreateConnection(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	workspaceID, err := parseWorkspaceID(c)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid workspace ID")
+	}
+	var req ConnectionInput
+	if err := c.Bind(&req); err != nil {
+		return apphttp.BadRequest(c, "Invalid request body")
+	}
+	conn, err := h.svc.CreateConnection(c.Request().Context(), user.ID, workspaceID, req)
+	if err != nil {
+		return connectionError(c, err, "Failed to create connection")
+	}
+	return apphttp.Created(c, conn)
+}
+
+func (h *Handler) TestConnection(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	workspaceID, err := parseWorkspaceID(c)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid workspace ID")
+	}
+	var req ConnectionInput
+	if err := c.Bind(&req); err != nil {
+		return apphttp.BadRequest(c, "Invalid request body")
+	}
+	if err := h.svc.TestConnection(c.Request().Context(), user.ID, workspaceID, req); err != nil {
+		if errors.Is(err, ErrWorkspaceNotFound) {
+			return apphttp.NotFound(c, "Workspace not found")
+		}
+		if errors.Is(err, ErrInvalidInput) {
+			return apphttp.BadRequest(c, "Invalid connection fields")
+		}
+		return apphttp.QueryError(c, err.Error())
+	}
+	return apphttp.Success(c, TestConnectionResponse{OK: true})
+}
+
+func parseWorkspaceID(c echo.Context) (int64, error) {
+	return strconv.ParseInt(c.Param("workspaceId"), 10, 64)
+}
+
+func connectionError(c echo.Context, err error, fallback string) error {
+	switch {
+	case errors.Is(err, ErrWorkspaceNotFound):
+		return apphttp.NotFound(c, "Workspace not found")
+	case errors.Is(err, ErrConnectionConflict):
+		return apphttp.BadRequest(c, "A connection with this name and environment already exists")
+	case errors.Is(err, ErrInvalidInput):
+		return apphttp.BadRequest(c, "Invalid connection fields")
+	default:
+		return apphttp.InternalError(c, fallback, err)
+	}
 }

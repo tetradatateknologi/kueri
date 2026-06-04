@@ -77,12 +77,12 @@ func newRouter(cfg *config.Config, pool *pgxpool.Pool) *echo.Echo {
 	e.Use(middleware.CORS(cfg.CORS.AllowedOrigins))
 
 	health.RegisterRoutes(e)
-	query.RegisterRoutes(e)
+	query.RegisterRoutes(e, pool, cfg)
 
 	api := e.Group("/api/v1")
 	api.Use(middleware.DevUser(pool, cfg.Dev.UserEmail))
 	me.RegisterRoutes(api)
-	workspace.RegisterRoutes(api, pool)
+	workspace.RegisterRoutes(api, pool, cfg)
 	script.RegisterRoutes(api, pool)
 
 	return e

@@ -9,8 +9,8 @@ import {
   type ReactNode,
 } from "react";
 import { getMe } from "@/lib/api/me";
-import { createScript, getScript, listScripts, runQuery, updateScript } from "@/lib/api/scripts";
-import type { QueryRunResult, Script, User, Workspace } from "@/lib/api/types";
+import { createScript, getScript, listScripts, updateScript } from "@/lib/api/scripts";
+import type { Script, User, Workspace } from "@/lib/api/types";
 import { listWorkspaces } from "@/lib/api/workspaces";
 
 type KueriAppContextValue = {
@@ -29,9 +29,6 @@ type KueriAppContextValue = {
   setActiveScriptId: (id: number) => void;
   saveActiveScript: () => Promise<void>;
   isSaving: boolean;
-  runActiveQuery: () => Promise<void>;
-  isRunning: boolean;
-  queryResult: QueryRunResult | null;
   refetchAll: () => void;
   createNewScript: () => Promise<void>;
 };
@@ -43,7 +40,6 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   const [openScriptIds, setOpenScriptIds] = useState<number[]>([]);
   const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
   const [draftSql, setDraftSql] = useState("");
-  const [queryResult, setQueryResult] = useState<QueryRunResult | null>(null);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe });
   const workspacesQuery = useQuery({ queryKey: ["workspaces"], queryFn: listWorkspaces });
@@ -75,11 +71,6 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       queryClient.setQueryData(["script", script.id], script);
       void queryClient.invalidateQueries({ queryKey: ["scripts"] });
     },
-  });
-
-  const runMutation = useMutation({
-    mutationFn: () => runQuery(draftSql),
-    onSuccess: setQueryResult,
   });
 
   const openScript = useCallback((id: number) => {
@@ -141,11 +132,6 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         await saveMutation.mutateAsync();
       },
       isSaving: saveMutation.isPending,
-      runActiveQuery: async () => {
-        await runMutation.mutateAsync();
-      },
-      isRunning: runMutation.isPending,
-      queryResult,
       refetchAll,
       createNewScript,
     }),
@@ -162,8 +148,6 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       openScript,
       closeScript,
       saveMutation,
-      runMutation,
-      queryResult,
       refetchAll,
       createNewScript,
     ],

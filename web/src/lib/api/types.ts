@@ -52,9 +52,21 @@ export type QueryResult = {
   cached: boolean;
 };
 
+export type ConnectionInput = {
+  name: string;
+  environment: string;
+  driver?: string;
+  host: string;
+  port: number;
+  database_name: string;
+  username: string;
+  password: string;
+  ssl_mode: string;
+};
+
 export type ExecuteQueryInput = {
   sql: string;
-  env: ApiEnv;
+  connection_id: number;
 };
 
 export type HealthResponse = { status: string };

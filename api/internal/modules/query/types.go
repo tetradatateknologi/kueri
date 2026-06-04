@@ -1,8 +1,8 @@
 package query
 
 type ExecuteRequest struct {
-	SQL string `json:"sql"`
-	Env string `json:"env"`
+	SQL          string `json:"sql"`
+	ConnectionID int64  `json:"connection_id"`
 }
 
 type ExecuteResult struct {

@@ -24,13 +24,3 @@ type CreateScriptRequest struct {
 	SqlText     string `json:"sql_text"`
 }
 
-type RunQueryRequest struct {
-	SqlText string `json:"sql_text"`
-}
-
-type RunQueryResponse struct {
-	RowCount    int                      `json:"row_count"`
-	DurationMs  int                      `json:"duration_ms"`
-	Columns     []string                 `json:"columns"`
-	Rows        []map[string]interface{} `json:"rows"`
-}

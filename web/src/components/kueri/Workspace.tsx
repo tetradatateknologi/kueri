@@ -1,20 +1,8 @@
-import { useCallback, useRef, useState } from "react";
-import {
-  ChevronDown,
-  Play,
-  X,
-  Plus,
-  Download,
-  Save,
-  Clock,
-  Check,
-  Loader2,
-} from "lucide-react";
-import { toast } from "sonner";
+import { useCallback, useState } from "react";
+import { Play, X, Plus, Download, Save, Clock, Loader2 } from "lucide-react";
 
 import { ExportModal } from "@/components/kueri/ExportModal";
 import { JsonResultsView } from "@/components/kueri/JsonResultsView";
-import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
 import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
 import { ResultsGrid } from "@/components/kueri/ResultsGrid";
 import { SqlEditor } from "@/components/kueri/SqlEditor";
@@ -31,12 +19,16 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { useKueriApp } from "@/context/kueri-app";
-import { useClickOutside } from "@/hooks/use-click-outside";
 import { useWorkspaceHotkeys } from "@/hooks/use-workspace-hotkeys";
 import { ApiError } from "@/lib/api/http";
 import { useExecuteQuery } from "@/lib/api/queries";
-import { envToApiEnv } from "@/lib/export-utils";
 import { saveScript } from "@/lib/saved-scripts";
+import {
+  showQueryErrorToast,
+  showQueryResultToast,
+  showSaveScriptToast,
+  showValidationError,
+} from "@/lib/toasts";
 import { cn } from "@/lib/utils";
 import { useWorkspaceStore, type WorkspaceEnv } from "@/stores/workspace-store";
 
@@ -45,8 +37,6 @@ const envMeta: Record<WorkspaceEnv, { dot: string; ring: string }> = {
   Staging: { dot: "bg-env-staging", ring: "ring-env-staging/40" },
   Production: { dot: "bg-env-prod", ring: "ring-env-prod/40" },
 };
-
-const ENVS: WorkspaceEnv[] = ["Development", "Staging", "Production"];
 
 export function Workspace() {
   const {
@@ -65,10 +55,10 @@ export function Workspace() {
   } = useKueriApp();
 
   const env = useWorkspaceStore((s) => s.env);
+  const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
   const lastResult = useWorkspaceStore((s) => s.lastResult);
   const lastQueryError = useWorkspaceStore((s) => s.lastQueryError);
   const resultsView = useWorkspaceStore((s) => s.resultsView);
-  const setEnv = useWorkspaceStore((s) => s.setEnv);
   const setLastResult = useWorkspaceStore((s) => s.setLastResult);
   const setLastQueryError = useWorkspaceStore((s) => s.setLastQueryError);
   const setResultsView = useWorkspaceStore((s) => s.setResultsView);
@@ -76,13 +66,8 @@ export function Workspace() {
 
   const executeMutation = useExecuteQuery();
 
-  const [envOpen, setEnvOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
-  const [prodDialogOpen, setProdDialogOpen] = useState(false);
-
-  const envRef = useRef<HTMLDivElement>(null);
-  useClickOutside(envRef, () => setEnvOpen(false), envOpen);
 
   const openTabs = openScriptIds
     .map((id) => scripts.find((s) => s.id === id))
@@ -93,12 +78,17 @@ export function Workspace() {
   const runQuery = useCallback(() => {
     const sql = draftSql.trim();
     if (!sql) {
-      toast.error("SQL is empty");
+      showValidationError("SQL is empty");
+      return;
+    }
+    const connectionId = selectedConnection?.connectionId;
+    if (!connectionId) {
+      showValidationError("Select a database connection in the sidebar");
       return;
     }
 
     executeMutation.mutate(
-      { sql, env: envToApiEnv(env) },
+      { sql, connection_id: connectionId },
       {
         onSuccess: (data) => {
           setLastResult(data);
@@ -109,46 +99,43 @@ export function Workspace() {
             rowCount: data.rowCount,
             durationMs: data.durationMs,
           });
-          toast.success(`Query finished — ${data.rowCount} rows in ${data.durationMs}ms`);
+          showQueryResultToast({
+            rowCount: data.rowCount,
+            durationMs: data.durationMs,
+            cached: data.cached,
+          });
         },
         onError: (err) => {
           const message =
             err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
           setLastQueryError(message);
-          toast.error(message);
+          showQueryErrorToast(message);
         },
       },
     );
-  }, [draftSql, env, executeMutation, pushHistory, setLastQueryError, setLastResult]);
+  }, [
+    draftSql,
+    selectedConnection?.connectionId,
+    executeMutation,
+    pushHistory,
+    setLastQueryError,
+    setLastResult,
+    env,
+  ]);
 
-  useWorkspaceHotkeys({
-    onRun: runQuery,
-    onToggleEnv: () => setEnvOpen((o) => !o),
-    onCloseEnv: () => setEnvOpen(false),
-    envOpen,
-  });
-
-  const selectEnv = (e: WorkspaceEnv) => {
-    if (e === "Production" && env !== "Production") {
-      setProdDialogOpen(true);
-      setEnvOpen(false);
-      return;
-    }
-    setEnv(e);
-    setEnvOpen(false);
-  };
+  useWorkspaceHotkeys({ onRun: runQuery });
 
   const handleSave = async () => {
     if (activeScriptId == null) {
       saveScript({ title: activeTitle, sql: draftSql });
-      toast.success("Saved to local library");
+      showSaveScriptToast({ local: true });
       return;
     }
     try {
       await saveActiveScript();
-      toast.success(`Saved "${activeTitle}"`);
+      showSaveScriptToast({ title: activeTitle });
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Save failed");
+      showQueryErrorToast(err instanceof Error ? err.message : "Save failed", "Save failed");
     }
   };
 
@@ -227,48 +214,23 @@ export function Workspace() {
         </div>
 
         <div className="h-12 px-3 flex items-center gap-2 border-b border-border bg-background">
-          <div className="relative" ref={envRef}>
-            <button
-              type="button"
-              aria-expanded={envOpen}
-              aria-haspopup="listbox"
-              onClick={() => setEnvOpen((o) => !o)}
-              className={cn(
-                "flex items-center gap-2 px-3 h-8 rounded-md bg-surface-1 border border-border text-xs hover:border-electric/60 transition-colors ring-1 ring-transparent",
-                envMeta[env].ring,
-              )}
-            >
-              <span className={cn("size-2 rounded-full", envMeta[env].dot)} />
-              <span className="text-muted-foreground">env:</span>
-              <span className="font-mono">{env}</span>
-              <ChevronDown className="size-3.5 text-muted-foreground" />
-            </button>
-
-            {envOpen && (
-              <div
-                role="listbox"
-                className="absolute top-9 left-0 z-20 w-56 bg-popover border border-border rounded-md shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
-              >
-                {ENVS.map((e) => (
-                  <button
-                    key={e}
-                    type="button"
-                    role="option"
-                    aria-selected={e === env}
-                    onClick={() => selectEnv(e)}
-                    className="w-full px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-surface-1 transition-colors"
-                  >
-                    <span className={cn("size-2 rounded-full", envMeta[e].dot)} />
-                    <span className="font-mono">{e}</span>
-                    {e === env && <Check className="size-3.5 ml-auto text-electric" />}
-                  </button>
-                ))}
-                <div className="border-t border-border mt-1 pt-1 px-3 pb-1 text-[10px] text-muted-foreground font-mono">
-                  ⌘E to switch
-                </div>
-              </div>
+          <div
+            className={cn(
+              "flex items-center gap-2 px-3 h-8 rounded-md bg-surface-1 border border-border text-xs ring-1 ring-transparent",
+              envMeta[env].ring,
             )}
+            title="Environment follows the selected sidebar connection"
+          >
+            <span className={cn("size-2 rounded-full", envMeta[env].dot)} />
+            <span className="text-muted-foreground">env:</span>
+            <span className="font-mono">{env}</span>
           </div>
+
+          {selectedConnection && (
+            <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
+              {selectedConnection.label} · {selectedConnection.host}
+            </span>
+          )}
 
           <div className="h-5 w-px bg-border mx-1" />
 
@@ -403,14 +365,6 @@ export function Workspace() {
           open={historyOpen}
           onOpenChange={setHistoryOpen}
           onPickSql={setDraftSql}
-        />
-        <ProductionEnvDialog
-          open={prodDialogOpen}
-          onOpenChange={setProdDialogOpen}
-          onConfirm={() => {
-            setEnv("Production");
-            setProdDialogOpen(false);
-          }}
         />
       </main>
     </TooltipProvider>

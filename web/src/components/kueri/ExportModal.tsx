@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { Sparkles } from "lucide-react";
-import { toast } from "sonner";
-
+import { useKueriApp } from "@/context/kueri-app";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,6 +18,7 @@ import {
   inferTableName,
   resultToCsv,
 } from "@/lib/export-utils";
+import { showExportToast, showValidationError } from "@/lib/toasts";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 type ExportModalProps = {
@@ -32,33 +32,35 @@ const TOKENS = ["{{project}}", "{{env}}", "{{table}}", "{{date}}", "{{user}}"];
 
 export function ExportModal({ open, onOpenChange, sql, title }: ExportModalProps) {
   const [filename, setFilename] = useState("{{project}}_{{env}}_{{table}}_{{date}}.csv");
+  const { me } = useKueriApp();
 
   const lastResult = useWorkspaceStore((s) => s.lastResult);
   const env = useWorkspaceStore((s) => s.env);
   const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
 
   const project = selectedConnection?.projectName ?? "kueri";
+  const userSlug = (me?.email ?? "user").split("@")[0] ?? "user";
 
   const preview = formatExportFilename(filename.replace(/\.csv$/i, ""), {
     project: project.toLowerCase().replace(/\s+/g, "_"),
     env,
     table: inferTableName(sql),
-    user: "alex.dev",
+    user: userSlug,
   });
 
   const handleExport = () => {
     if (!lastResult) {
-      toast.error("No results to export");
+      showValidationError("No results to export");
       return;
     }
     const name = formatExportFilename(filename.replace(/\.csv$/i, ""), {
       project: project.toLowerCase().replace(/\s+/g, "_"),
       env,
       table: inferTableName(sql),
-      user: "alex.dev",
+      user: userSlug,
     });
     downloadCsv(name, resultToCsv(lastResult));
-    toast.success(`Exported ${name}.csv`);
+    showExportToast({ filename: `${name}.csv`, rowCount: lastResult.rowCount });
     onOpenChange(false);
   };
 

@@ -21,6 +21,15 @@ FROM connections
 WHERE id = $1
   AND deleted_at IS NULL;
 
+-- name: GetConnectionForUser :one
+SELECT c.*
+FROM connections c
+INNER JOIN workspaces w ON w.id = c.workspace_id
+WHERE c.id = $1
+  AND w.user_id = $2
+  AND c.deleted_at IS NULL
+  AND w.deleted_at IS NULL;
+
 -- name: ListConnectionsByWorkspace :many
 SELECT *
 FROM connections
