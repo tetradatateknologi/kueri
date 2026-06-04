@@ -17,8 +17,8 @@ export default function App() {
       <KueriAppProvider>
         <div className="dark h-screen w-screen flex bg-background text-foreground overflow-hidden">
           <Sidebar />
-          <Workspace />
           <ApiStatus />
+          <Workspace />
         </div>
         <Toaster />
       </KueriAppProvider>
