@@ -243,6 +243,17 @@ export function Sidebar() {
     selectConnection(selected);
   };
 
+  const openEditConnection = (
+    workspace: (typeof workspaces)[0],
+    conn: (typeof workspaces)[0]["connections"][0],
+  ) => {
+    setEditConnectionDialog({
+      workspaceId: workspace.id,
+      workspaceName: workspace.name,
+      connection: conn,
+    });
+  };
+
   const isConnActive = (
     _workspace: (typeof workspaces)[0],
     conn: (typeof workspaces)[0]["connections"][0],
@@ -358,6 +369,7 @@ export function Sidebar() {
                                 <button
                                   type="button"
                                   onClick={() => pickConnection(ws, c)}
+                                  onDoubleClick={() => openEditConnection(ws, c)}
                                   className={cn(
                                     "flex-1 flex items-center gap-2 px-2 py-1.5 rounded-md text-xs hover:bg-surface-1 transition-colors min-w-0",
                                     isConnActive(ws, c) && "bg-surface-1 ring-1 ring-electric/30",
@@ -375,13 +387,7 @@ export function Sidebar() {
                                   </span>
                                 </button>
                                 <SidebarItemMenu
-                                  onEdit={() =>
-                                    setEditConnectionDialog({
-                                      workspaceId: ws.id,
-                                      workspaceName: ws.name,
-                                      connection: c,
-                                    })
-                                  }
+                                  onEdit={() => openEditConnection(ws, c)}
                                   onDelete={() =>
                                     setDeleteTarget({
                                       kind: "connection",
