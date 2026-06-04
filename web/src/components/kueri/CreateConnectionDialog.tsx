@@ -440,11 +440,6 @@ export function CreateConnectionDialog({
               </div>
               <div>
                 <Label className="text-xs text-muted-foreground">Password</Label>
-                {isEdit && (
-                  <p className="text-[10px] text-muted-foreground mt-0.5">
-                    Leave blank to keep the current password.
-                  </p>
-                )}
                 <div className="relative mt-1">
                   <Input
                     className="font-mono text-sm pr-9"
@@ -462,6 +457,11 @@ export function CreateConnectionDialog({
                     {showPassword ? <EyeOff className="size-3.5" /> : <Eye className="size-3.5" />}
                   </button>
                 </div>
+                {isEdit && (
+                  <p className="mt-1 text-[10px] text-muted-foreground">
+                    Leave blank to keep the current password.
+                  </p>
+                )}
               </div>
             </div>
 
