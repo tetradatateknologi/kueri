@@ -1,0 +1,58 @@
+# CI: validate kueri-api and kueri-web on every pull request targeting main.
+# No repository secrets required (public fork–friendly); only standard Actions minutes.
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  kueri-api:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: api/go.sum
+
+      - name: Test and build
+        working-directory: api
+        run: |
+          go test ./...
+          go build -o /tmp/kueri-api ./cmd/api
+
+  kueri-web:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Install
+        working-directory: web
+        run: npm ci
+
+      - name: Test
+        working-directory: web
+        run: npm run test
+
+      - name: Build
+        working-directory: web
+        run: npm run build
