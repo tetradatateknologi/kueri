@@ -12,6 +12,7 @@ import {
   ResizablePanelGroup,
 } from "@/components/ui/resizable";
 import { Skeleton } from "@/components/ui/skeleton";
+import { SidebarTrigger } from "@/components/ui/sidebar";
 import {
   Tooltip,
   TooltipContent,
@@ -149,23 +150,34 @@ export function Workspace() {
 
   if (isLoading) {
     return (
-      <main className="flex-1 flex flex-col h-full min-w-0 p-4 gap-3">
+      <div className="flex flex-1 flex-col h-full min-h-0 min-w-0 p-4 gap-3">
         <Skeleton className="h-10 w-full" />
         <Skeleton className="h-12 w-full" />
         <Skeleton className="flex-1 w-full" />
-      </main>
+      </div>
     );
   }
 
   return (
     <TooltipProvider>
-      <main className="flex-1 flex flex-col h-full min-w-0">
+      <div className="flex flex-1 flex-col h-full min-h-0 min-w-0">
         <div
-          className="h-10 bg-sidebar border-b border-border flex items-end pl-1 pr-2 select-none"
+          className="h-10 bg-sidebar border-b border-border flex items-end pl-1 pr-2 select-none gap-1"
           role="tablist"
           aria-label="SQL editor tabs"
         >
-          <div className="flex items-end gap-px overflow-x-auto">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="flex items-center self-center shrink-0 pb-0.5">
+                <SidebarTrigger className="size-8" />
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="bottom">
+              <p className="text-xs">Toggle sidebar</p>
+              <p className="text-[10px] text-muted-foreground font-mono">⌘B</p>
+            </TooltipContent>
+          </Tooltip>
+          <div className="flex items-end gap-px overflow-x-auto min-w-0 flex-1">
             {openTabs.map((t) => {
               const isActive = t.id === activeScriptId;
               return (
@@ -377,7 +389,7 @@ export function Workspace() {
           onOpenChange={setHistoryOpen}
           onPickSql={setDraftSql}
         />
-      </main>
+      </div>
     </TooltipProvider>
   );
 }

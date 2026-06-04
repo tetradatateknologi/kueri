@@ -9,10 +9,16 @@ import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
 import { RenameDialog } from "@/components/kueri/RenameDialog";
 import { SidebarItemMenu } from "@/components/kueri/SidebarItemMenu";
 import { SidebarSectionSkeleton } from "@/components/kueri/SidebarSectionSkeleton";
+import {
+  Sidebar as UiSidebar,
+  SidebarContent,
+  SidebarHeader,
+  SidebarRail,
+} from "@/components/ui/sidebar";
 import { useKueriApp } from "@/context/kueri-app";
 import { ApiError } from "@/lib/api/http";
 import { deleteScript } from "@/lib/api/scripts";
-import type { Script, Workspace } from "@/lib/api/types";
+import type { Script } from "@/lib/api/types";
 import {
   deleteConnection,
   deleteWorkspace,
@@ -228,17 +234,18 @@ export function Sidebar() {
 
   return (
     <>
-      <aside className="w-72 shrink-0 bg-sidebar border-r border-sidebar-border flex flex-col h-full">
-        <div className="h-12 px-4 flex items-center gap-2 border-b border-sidebar-border">
-          <div className="size-6 rounded-md bg-gradient-to-br from-electric to-neon flex items-center justify-center">
+      <UiSidebar collapsible="offcanvas" className="border-sidebar-border">
+        <SidebarRail />
+        <SidebarHeader className="h-12 flex-row items-center gap-2 border-b border-sidebar-border px-3 py-0">
+          <div className="size-6 rounded-md bg-gradient-to-br from-electric to-neon flex items-center justify-center shrink-0">
             <Database className="size-3.5 text-background" />
           </div>
-          <span className="font-mono text-sm tracking-tight">
+          <span className="font-mono text-sm tracking-tight truncate">
             kueri<span className="text-electric">.dev</span>
           </span>
-        </div>
+        </SidebarHeader>
 
-        <div className="px-3 pt-3">
+        <div className="px-3 pt-3 shrink-0">
           <div className="relative">
             <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -250,7 +257,7 @@ export function Sidebar() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-2 py-3 space-y-5">
+        <SidebarContent className="px-2 py-3 space-y-5">
           {showSkeleton ? (
             <SidebarSectionSkeleton />
           ) : (
@@ -411,8 +418,8 @@ export function Sidebar() {
               </div>
             </>
           )}
-        </div>
-      </aside>
+        </SidebarContent>
+      </UiSidebar>
 
       <CreateWorkspaceDialog open={workspaceDialogOpen} onOpenChange={setWorkspaceDialogOpen} />
       {connectionDialog && (
