@@ -16,6 +16,15 @@ WHERE user_id = $1
   AND deleted_at IS NULL
 ORDER BY name;
 
+-- name: ListWorkspacesByUserSearch :many
+SELECT *
+FROM workspaces
+WHERE user_id = sqlc.arg('user_id')
+  AND deleted_at IS NULL
+  AND name ILIKE '%' || sqlc.arg('search') || '%'
+ORDER BY name
+LIMIT 50;
+
 -- name: UpdateWorkspaceName :one
 UPDATE workspaces
 SET name = $2,

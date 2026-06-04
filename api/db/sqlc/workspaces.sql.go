@@ -90,6 +90,48 @@ func (q *Queries) ListWorkspacesByUser(ctx context.Context, userID int64) ([]Wor
 	return items, nil
 }
 
+const listWorkspacesByUserSearch = `-- name: ListWorkspacesByUserSearch :many
+SELECT id, user_id, name, created_at, updated_at, deleted_at
+FROM workspaces
+WHERE user_id = $1
+  AND deleted_at IS NULL
+  AND name ILIKE '%' || $2 || '%'
+ORDER BY name
+LIMIT 50
+`
+
+type ListWorkspacesByUserSearchParams struct {
+	UserID int64   `json:"user_id"`
+	Search *string `json:"search"`
+}
+
+func (q *Queries) ListWorkspacesByUserSearch(ctx context.Context, arg ListWorkspacesByUserSearchParams) ([]Workspace, error) {
+	rows, err := q.db.Query(ctx, listWorkspacesByUserSearch, arg.UserID, arg.Search)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	items := []Workspace{}
+	for rows.Next() {
+		var i Workspace
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Name,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.DeletedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const softDeleteWorkspace = `-- name: SoftDeleteWorkspace :exec
 UPDATE workspaces
 SET deleted_at = NOW(),

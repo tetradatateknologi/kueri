@@ -5,6 +5,11 @@ export function listWorkspaces() {
   return apiFetch<Workspace[]>("/api/v1/workspaces");
 }
 
+export function searchWorkspaces(query: string) {
+  const params = new URLSearchParams({ q: query });
+  return apiFetch<Workspace[]>(`/api/v1/workspaces?${params}`);
+}
+
 export function createWorkspace(body: { name: string }) {
   return apiFetch<Workspace>("/api/v1/workspaces", {
     method: "POST",

@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/kueri/ConfirmDeleteDialog";
+import { ProjectFilterCombobox } from "@/components/kueri/ProjectFilterCombobox";
 import { FavoritesSection } from "@/components/kueri/FavoritesSection";
 import { KueriLogo } from "@/components/kueri/KueriLogo";
 import { ScriptFavoriteButton } from "@/components/kueri/ScriptFavoriteButton";
@@ -311,23 +312,11 @@ export function Sidebar() {
           </div>
           <div className="flex items-center gap-1">
             <Filter className="size-3 shrink-0 text-muted-foreground" aria-hidden />
-            <select
-              value={projectWorkspaceId ?? ""}
-              onChange={(e) => {
-                const id = e.target.value ? Number(e.target.value) : null;
-                const ws = id != null ? workspaces.find((w) => w.id === id) : null;
-                setProjectFilter(ws ?? null);
-              }}
-              className="flex-1 min-w-0 bg-surface-1 border border-border rounded-md text-xs px-2 py-1.5 outline-none focus:border-electric/60 focus:ring-1 focus:ring-electric/30 transition-colors"
-              aria-label="Filter by project"
-            >
-              <option value="">All projects</option>
-              {workspaces.map((ws) => (
-                <option key={ws.id} value={ws.id}>
-                  {ws.name}
-                </option>
-              ))}
-            </select>
+            <ProjectFilterCombobox
+              value={projectWorkspaceId}
+              workspaces={workspaces}
+              onChange={setProjectFilter}
+            />
             {projectWorkspaceId != null && (
               <button
                 type="button"

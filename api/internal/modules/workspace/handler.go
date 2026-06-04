@@ -3,6 +3,7 @@ package workspace
 import (
 	"errors"
 	"strconv"
+	"strings"
 
 	"github.com/labstack/echo/v4"
 
@@ -22,6 +23,14 @@ func (h *Handler) List(c echo.Context) error {
 	user, ok := middleware.UserFromContext(c.Request().Context())
 	if !ok {
 		return apphttp.NotFound(c, "User not found")
+	}
+	if _, hasQ := c.QueryParams()["q"]; hasQ {
+		q := strings.TrimSpace(c.QueryParam("q"))
+		workspaces, err := h.svc.SearchForUser(c.Request().Context(), user.ID, q)
+		if err != nil {
+			return apphttp.InternalError(c, "Failed to search workspaces", err)
+		}
+		return apphttp.Success(c, workspaces)
 	}
 	workspaces, err := h.svc.ListForUser(c.Request().Context(), user.ID)
 	if err != nil {

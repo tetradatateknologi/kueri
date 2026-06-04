@@ -50,6 +50,36 @@ func (s *Service) ListForUser(ctx context.Context, userID int64) ([]WorkspaceRes
 	return out, nil
 }
 
+func (s *Service) SearchForUser(ctx context.Context, userID int64, query string) ([]WorkspaceResponse, error) {
+	query = strings.TrimSpace(query)
+	var rows []sqlc.Workspace
+	var err error
+	if query == "" {
+		rows, err = s.q.ListWorkspacesByUser(ctx, userID)
+	} else {
+		search := query
+		rows, err = s.q.ListWorkspacesByUserSearch(ctx, sqlc.ListWorkspacesByUserSearchParams{
+			UserID: userID,
+			Search: &search,
+		})
+	}
+	if err != nil {
+		return nil, err
+	}
+	if len(rows) > 50 {
+		rows = rows[:50]
+	}
+	out := make([]WorkspaceResponse, 0, len(rows))
+	for _, ws := range rows {
+		out = append(out, WorkspaceResponse{
+			ID:          ws.ID,
+			Name:        ws.Name,
+			Connections: []ConnectionResponse{},
+		})
+	}
+	return out, nil
+}
+
 func (s *Service) Update(ctx context.Context, userID, workspaceID int64, name string) (WorkspaceResponse, error) {
 	if err := authz.EnsureWorkspaceOwner(ctx, s.q, userID, workspaceID); err != nil {
 		if errors.Is(err, authz.ErrWorkspaceNotFound) {
