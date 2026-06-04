@@ -1,3 +1,5 @@
+export type ApiEnv = "development" | "staging" | "production";
+
 export type User = {
   id: number;
   name: string;
@@ -24,7 +26,7 @@ export type Workspace = {
 
 export type ScriptTag = {
   name: string;
-  color: "electric" | "neon" | "danger";
+  color: string;
 };
 
 export type Script = {
@@ -41,3 +43,21 @@ export type QueryRunResult = {
   columns: string[];
   rows: Record<string, unknown>[];
 };
+
+export type QueryResult = {
+  columns: string[];
+  rows: unknown[][];
+  rowCount: number;
+  durationMs: number;
+  cached: boolean;
+};
+
+export type ExecuteQueryInput = {
+  sql: string;
+  env: ApiEnv;
+};
+
+export type HealthResponse = { status: string };
+export type PingResponse = { message: string };
+
+export { ApiError } from "./http";

@@ -63,6 +63,20 @@ npm run dev
 | API | http://localhost:8080 |
 | Web | http://localhost:5173 |
 
+- `GET /health`, `GET /ping` — API status (dev badge on the web app)
+- `POST /query` — stub query execution (`{ "sql": "...", "env": "development"|"staging"|"production" }`) with mock rows and simulated latency
+- `POST /api/v1/query/run` — authenticated query stub when the database is seeded (used by script save/load flows)
+
+### Web keyboard shortcuts
+
+| Shortcut | Action |
+|----------|--------|
+| ⌘↵ / Ctrl+Enter | Run query |
+| ⌘E / Ctrl+E | Toggle environment menu |
+| Escape | Close environment menu |
+
+Set `VITE_API_BASE_URL` in `web/.env` when not using the Vite dev proxy (see `web/.env.example`).
+
 ---
 
 ## Project tree (aligned with `one`)

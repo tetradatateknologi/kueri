@@ -1,3 +1,5 @@
+import type { ExecuteQueryInput, QueryResult } from "./types";
+
 const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.replace(/\/$/, "") ?? "";
 
 export class ApiError extends Error {
@@ -36,4 +38,11 @@ export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> 
   }
 
   return body.data;
+}
+
+export async function executeQuery(input: ExecuteQueryInput): Promise<QueryResult> {
+  return apiFetch<QueryResult>("/query", {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
 }

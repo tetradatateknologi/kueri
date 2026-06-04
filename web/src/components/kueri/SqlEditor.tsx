@@ -1,77 +1,85 @@
-import { useMemo } from "react";
+import { sql } from "@codemirror/lang-sql";
+import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
+import { oneDark } from "@codemirror/theme-one-dark";
+import { EditorState } from "@codemirror/state";
+import { EditorView, keymap, lineNumbers } from "@codemirror/view";
+import { useEffect, useRef } from "react";
+
 import { cn } from "@/lib/utils";
-
-const KEYWORDS = new Set([
-  "SELECT", "FROM", "WHERE", "JOIN", "LEFT", "RIGHT", "INNER", "OUTER", "ON", "GROUP", "BY", "ORDER",
-  "LIMIT", "AS", "AND", "OR", "NOT", "IN", "IS", "NULL", "INSERT", "INTO", "VALUES", "UPDATE", "SET",
-  "DELETE", "WITH", "HAVING", "DESC", "ASC", "CASE", "WHEN", "THEN", "ELSE", "END", "DISTINCT",
-]);
-
-function highlight(line: string) {
-  const parts = line.split(/(\s+|,|\(|\)|;|'[^']*')/g).filter(Boolean);
-  return parts.map((tok, i) => {
-    if (/^'[^']*'$/.test(tok)) return <span key={i} className="text-syntax-string">{tok}</span>;
-    if (/^--/.test(tok)) return <span key={i} className="text-syntax-comment">{tok}</span>;
-    if (/^\d+(\.\d+)?$/.test(tok)) return <span key={i} className="text-syntax-number">{tok}</span>;
-    if (KEYWORDS.has(tok.toUpperCase()))
-      return (
-        <span key={i} className="text-syntax-keyword font-medium">
-          {tok}
-        </span>
-      );
-    if (/^[a-zA-Z_]+$/.test(tok) && parts[i + 1] === "(")
-      return (
-        <span key={i} className="text-syntax-function">
-          {tok}
-        </span>
-      );
-    return <span key={i}>{tok}</span>;
-  });
-}
 
 type SqlEditorProps = {
   value: string;
-  onChange?: (value: string) => void;
+  onChange: (value: string) => void;
+  readOnly?: boolean;
+  className?: string;
 };
 
-export function SqlEditor({ value, onChange }: SqlEditorProps) {
-  const lines = useMemo(() => value.split("\n"), [value]);
-  const editable = Boolean(onChange);
+export function SqlEditor({ value, onChange, readOnly = false, className }: SqlEditorProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const viewRef = useRef<EditorView | null>(null);
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
 
-  if (editable) {
-    return (
-      <div className="h-full overflow-auto bg-surface-1 font-mono text-[13px] leading-6">
-        <textarea
-          value={value}
-          onChange={(e) => onChange?.(e.target.value)}
-          spellCheck={false}
-          className={cn(
-            "w-full h-full min-h-[200px] resize-none bg-transparent py-3 px-4",
-            "text-foreground outline-none border-0 focus:ring-0",
-            "placeholder:text-muted-foreground",
-          )}
-          placeholder="-- Write SQL here"
-        />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (!containerRef.current) return;
+
+    const updateListener = EditorView.updateListener.of((update) => {
+      if (update.docChanged) {
+        onChangeRef.current(update.state.doc.toString());
+      }
+    });
+
+    const state = EditorState.create({
+      doc: value,
+      extensions: [
+        lineNumbers(),
+        history(),
+        sql(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
+        oneDark,
+        keymap.of([...defaultKeymap, ...historyKeymap]),
+        EditorView.lineWrapping,
+        EditorState.readOnly.of(readOnly),
+        updateListener,
+        EditorView.theme({
+          "&": { height: "100%", fontSize: "13px" },
+          ".cm-scroller": { fontFamily: "var(--font-mono)" },
+          ".cm-content": { padding: "12px 0" },
+          ".cm-gutters": {
+            backgroundColor: "transparent",
+            borderRight: "1px solid var(--border)",
+            color: "var(--muted-foreground)",
+          },
+        }),
+      ],
+    });
+
+    const view = new EditorView({ state, parent: containerRef.current });
+    viewRef.current = view;
+
+    return () => {
+      view.destroy();
+      viewRef.current = null;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once
+  }, [readOnly]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    const current = view.state.doc.toString();
+    if (current !== value) {
+      view.dispatch({
+        changes: { from: 0, to: current.length, insert: value },
+      });
+    }
+  }, [value]);
 
   return (
-    <div className="h-full overflow-auto bg-surface-1 font-mono text-[13px] leading-6">
-      <div className="flex min-h-full">
-        <div className="select-none text-right pr-3 pl-4 py-3 text-muted-foreground/60 border-r border-border bg-background/40">
-          {lines.map((_, i) => (
-            <div key={i}>{i + 1}</div>
-          ))}
-        </div>
-        <pre className="py-3 px-4 flex-1 whitespace-pre-wrap">
-          {lines.map((line, i) => (
-            <div key={i} className="min-h-6">
-              {line.length ? highlight(line) : "\u00A0"}
-            </div>
-          ))}
-        </pre>
-      </div>
-    </div>
+    <div
+      ref={containerRef}
+      className={cn("h-full min-h-0 overflow-hidden bg-surface-1", className)}
+    />
   );
 }

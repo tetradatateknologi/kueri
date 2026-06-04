@@ -1,64 +1,94 @@
-import { useEffect, useState } from "react";
-import { X, Sparkles } from "lucide-react";
+import { useState } from "react";
+import { Sparkles } from "lucide-react";
+import { toast } from "sonner";
 
-export function ExportModal({
-  open,
-  onClose,
-}: {
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import {
+  downloadCsv,
+  formatExportFilename,
+  inferTableName,
+  resultToCsv,
+} from "@/lib/export-utils";
+import { useWorkspaceStore } from "@/stores/workspace-store";
+
+type ExportModalProps = {
   open: boolean;
-  onClose: () => void;
-}) {
+  onOpenChange: (open: boolean) => void;
+  sql: string;
+  title: string;
+};
+
+const TOKENS = ["{{project}}", "{{env}}", "{{table}}", "{{date}}", "{{user}}"];
+
+export function ExportModal({ open, onOpenChange, sql, title }: ExportModalProps) {
   const [filename, setFilename] = useState("{{project}}_{{env}}_{{table}}_{{date}}.csv");
 
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+  const lastResult = useWorkspaceStore((s) => s.lastResult);
+  const env = useWorkspaceStore((s) => s.env);
+  const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
+
+  const project = selectedConnection?.projectName ?? "kueri";
+
+  const preview = formatExportFilename(filename.replace(/\.csv$/i, ""), {
+    project: project.toLowerCase().replace(/\s+/g, "_"),
+    env,
+    table: inferTableName(sql),
+    user: "alex.dev",
+  });
+
+  const handleExport = () => {
+    if (!lastResult) {
+      toast.error("No results to export");
+      return;
     }
-    if (open) window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-
-  const preview = filename
-    .replace("{{project}}", "ecommerce")
-    .replace("{{env}}", "prod")
-    .replace("{{table}}", "orders")
-    .replace("{{date}}", new Date().toISOString().slice(0, 10));
+    const name = formatExportFilename(filename.replace(/\.csv$/i, ""), {
+      project: project.toLowerCase().replace(/\s+/g, "_"),
+      env,
+      table: inferTableName(sql),
+      user: "alex.dev",
+    });
+    downloadCsv(name, resultToCsv(lastResult));
+    toast.success(`Exported ${name}.csv`);
+    onOpenChange(false);
+  };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-in fade-in duration-150">
-      <div
-        className="absolute inset-0 bg-background/70 backdrop-blur-sm"
-        onClick={onClose}
-      />
-      <div className="relative w-full max-w-lg rounded-xl border border-border bg-card shadow-2xl glow-electric animate-in zoom-in-95 duration-150">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
-          <div className="flex items-center gap-2">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
             <Sparkles className="size-4 text-electric" />
-            <h2 className="text-sm font-medium">Smart Export</h2>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <X className="size-4" />
-          </button>
-        </div>
+            Smart Export
+          </DialogTitle>
+          <DialogDescription>
+            Download results for <span className="font-mono text-foreground">{title}</span> as CSV.
+          </DialogDescription>
+        </DialogHeader>
 
-        <div className="px-5 py-5 space-y-4">
+        <div className="space-y-4 py-2">
           <div>
-            <label className="text-xs text-muted-foreground block mb-1.5">
-              Dynamic Filename Format
-            </label>
-            <input
+            <Label htmlFor="export-filename" className="text-xs text-muted-foreground">
+              Dynamic filename format
+            </Label>
+            <Input
+              id="export-filename"
               value={filename}
               onChange={(e) => setFilename(e.target.value)}
-              className="w-full bg-surface-1 border border-border rounded-md px-3 py-2 text-sm font-mono outline-none focus:border-electric/60 focus:ring-1 focus:ring-electric/30 transition-colors"
+              className="mt-1.5 font-mono text-sm"
             />
-            <div className="mt-2 text-[11px] text-muted-foreground font-mono">
-              Preview: <span className="text-neon">{preview}</span>
-            </div>
+            <p className="mt-2 text-[11px] text-muted-foreground font-mono">
+              Preview: <span className="text-neon">{preview}.csv</span>
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 text-xs">
@@ -68,15 +98,16 @@ export function ExportModal({
             </div>
             <div className="bg-surface-1 border border-border rounded-md px-3 py-2">
               <div className="text-muted-foreground text-[10px] uppercase tracking-wider">Rows</div>
-              <div className="font-mono mt-0.5">8</div>
+              <div className="font-mono mt-0.5">{lastResult?.rowCount ?? 0}</div>
             </div>
           </div>
 
-          <div className="text-[11px] text-muted-foreground font-mono space-x-2">
+          <div className="text-[11px] text-muted-foreground font-mono flex flex-wrap gap-2">
             <span className="text-muted-foreground/70">Tokens:</span>
-            {["{{project}}", "{{env}}", "{{table}}", "{{date}}", "{{user}}"].map((t) => (
+            {TOKENS.map((t) => (
               <button
                 key={t}
+                type="button"
                 onClick={() => setFilename((f) => f + t)}
                 className="text-electric/80 hover:text-electric transition-colors"
               >
@@ -86,21 +117,15 @@ export function ExportModal({
           </div>
         </div>
 
-        <div className="px-5 py-3 border-t border-border flex items-center justify-end gap-2">
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs rounded-md border border-border hover:bg-surface-1 transition-colors"
-          >
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => onOpenChange(false)}>
             Cancel
-          </button>
-          <button
-            onClick={onClose}
-            className="px-3 py-1.5 text-xs rounded-md bg-electric text-primary-foreground font-medium hover:brightness-110 transition-all glow-electric"
-          >
+          </Button>
+          <Button size="sm" disabled={!lastResult} onClick={handleExport}>
             Export
-          </button>
-        </div>
-      </div>
-    </div>
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }

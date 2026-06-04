@@ -1,208 +1,418 @@
-import { useState } from "react";
-import { ChevronDown, Play, X, Plus, Download, Save, Clock, Check, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { SqlEditor } from "./SqlEditor";
-import { ResultsGrid } from "./ResultsGrid";
-import { ExportModal } from "./ExportModal";
-import { useKueriApp } from "@/context/kueri-app";
+import { useCallback, useRef, useState } from "react";
+import {
+  ChevronDown,
+  Play,
+  X,
+  Plus,
+  Download,
+  Save,
+  Clock,
+  Check,
+  Loader2,
+} from "lucide-react";
+import { toast } from "sonner";
 
-type Env = "Development" | "Staging" | "Production";
-const envMeta: Record<Env, { dot: string; ring: string }> = {
+import { ExportModal } from "@/components/kueri/ExportModal";
+import { JsonResultsView } from "@/components/kueri/JsonResultsView";
+import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
+import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
+import { ResultsGrid } from "@/components/kueri/ResultsGrid";
+import { SqlEditor } from "@/components/kueri/SqlEditor";
+import {
+  ResizableHandle,
+  ResizablePanel,
+  ResizablePanelGroup,
+} from "@/components/ui/resizable";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useKueriApp } from "@/context/kueri-app";
+import { useClickOutside } from "@/hooks/use-click-outside";
+import { useWorkspaceHotkeys } from "@/hooks/use-workspace-hotkeys";
+import { ApiError } from "@/lib/api/http";
+import { useExecuteQuery } from "@/lib/api/queries";
+import { envToApiEnv } from "@/lib/export-utils";
+import { saveScript } from "@/lib/saved-scripts";
+import { cn } from "@/lib/utils";
+import { useWorkspaceStore, type WorkspaceEnv } from "@/stores/workspace-store";
+
+const envMeta: Record<WorkspaceEnv, { dot: string; ring: string }> = {
   Development: { dot: "bg-env-dev", ring: "ring-env-dev/40" },
   Staging: { dot: "bg-env-staging", ring: "ring-env-staging/40" },
   Production: { dot: "bg-env-prod", ring: "ring-env-prod/40" },
 };
+
+const ENVS: WorkspaceEnv[] = ["Development", "Staging", "Production"];
 
 export function Workspace() {
   const {
     scripts,
     openScriptIds,
     activeScriptId,
-    setActiveScriptId,
-    closeScript,
+    activeScript,
     draftSql,
     setDraftSql,
+    closeScript,
+    setActiveScriptId,
     saveActiveScript,
     isSaving,
-    runActiveQuery,
-    isRunning,
-    queryResult,
+    isLoading,
     createNewScript,
   } = useKueriApp();
 
-  const [env, setEnv] = useState<Env>("Staging");
+  const env = useWorkspaceStore((s) => s.env);
+  const lastResult = useWorkspaceStore((s) => s.lastResult);
+  const lastQueryError = useWorkspaceStore((s) => s.lastQueryError);
+  const resultsView = useWorkspaceStore((s) => s.resultsView);
+  const setEnv = useWorkspaceStore((s) => s.setEnv);
+  const setLastResult = useWorkspaceStore((s) => s.setLastResult);
+  const setLastQueryError = useWorkspaceStore((s) => s.setLastQueryError);
+  const setResultsView = useWorkspaceStore((s) => s.setResultsView);
+  const pushHistory = useWorkspaceStore((s) => s.pushHistory);
+
+  const executeMutation = useExecuteQuery();
+
   const [envOpen, setEnvOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [prodDialogOpen, setProdDialogOpen] = useState(false);
+
+  const envRef = useRef<HTMLDivElement>(null);
+  useClickOutside(envRef, () => setEnvOpen(false), envOpen);
 
   const openTabs = openScriptIds
     .map((id) => scripts.find((s) => s.id === id))
     .filter((s): s is NonNullable<typeof s> => s != null);
 
-  const lineCount = draftSql.split("\n").length;
+  const activeTitle = activeScript?.title ?? "untitled.sql";
+
+  const runQuery = useCallback(() => {
+    const sql = draftSql.trim();
+    if (!sql) {
+      toast.error("SQL is empty");
+      return;
+    }
+
+    executeMutation.mutate(
+      { sql, env: envToApiEnv(env) },
+      {
+        onSuccess: (data) => {
+          setLastResult(data);
+          pushHistory({
+            sql,
+            env,
+            ranAt: new Date().toISOString(),
+            rowCount: data.rowCount,
+            durationMs: data.durationMs,
+          });
+          toast.success(`Query finished — ${data.rowCount} rows in ${data.durationMs}ms`);
+        },
+        onError: (err) => {
+          const message =
+            err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
+          setLastQueryError(message);
+          toast.error(message);
+        },
+      },
+    );
+  }, [draftSql, env, executeMutation, pushHistory, setLastQueryError, setLastResult]);
+
+  useWorkspaceHotkeys({
+    onRun: runQuery,
+    onToggleEnv: () => setEnvOpen((o) => !o),
+    onCloseEnv: () => setEnvOpen(false),
+    envOpen,
+  });
+
+  const selectEnv = (e: WorkspaceEnv) => {
+    if (e === "Production" && env !== "Production") {
+      setProdDialogOpen(true);
+      setEnvOpen(false);
+      return;
+    }
+    setEnv(e);
+    setEnvOpen(false);
+  };
+
+  const handleSave = async () => {
+    if (activeScriptId == null) {
+      saveScript({ title: activeTitle, sql: draftSql });
+      toast.success("Saved to local library");
+      return;
+    }
+    try {
+      await saveActiveScript();
+      toast.success(`Saved "${activeTitle}"`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Save failed");
+    }
+  };
+
+  const metaLabel =
+    lastResult != null
+      ? `${lastResult.rowCount} rows • ${lastResult.durationMs} ms${lastResult.cached ? " • cached" : ""}`
+      : executeMutation.isPending
+        ? "Running…"
+        : null;
+
+  if (isLoading) {
+    return (
+      <main className="flex-1 flex flex-col h-full min-w-0 p-4 gap-3">
+        <Skeleton className="h-10 w-full" />
+        <Skeleton className="h-12 w-full" />
+        <Skeleton className="flex-1 w-full" />
+      </main>
+    );
+  }
 
   return (
-    <main className="flex-1 flex flex-col h-full min-w-0">
-      <div className="h-10 bg-sidebar border-b border-border flex items-end pl-1 pr-2 select-none">
-        <div className="flex items-end gap-px overflow-x-auto">
-          {openTabs.map((t) => {
-            const isActive = t.id === activeScriptId;
-            return (
+    <TooltipProvider>
+      <main className="flex-1 flex flex-col h-full min-w-0">
+        <div
+          className="h-10 bg-sidebar border-b border-border flex items-end pl-1 pr-2 select-none"
+          role="tablist"
+          aria-label="SQL editor tabs"
+        >
+          <div className="flex items-end gap-px overflow-x-auto">
+            {openTabs.map((t) => {
+              const isActive = t.id === activeScriptId;
+              return (
+                <div
+                  key={t.id}
+                  role="tab"
+                  aria-selected={isActive}
+                  tabIndex={isActive ? 0 : -1}
+                  onClick={() => setActiveScriptId(t.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" || e.key === " ") {
+                      e.preventDefault();
+                      setActiveScriptId(t.id);
+                    }
+                  }}
+                  className={cn(
+                    "group h-9 pl-3 pr-1.5 flex items-center gap-2 text-xs cursor-pointer border-t-2 transition-colors rounded-t-md outline-none focus-visible:ring-1 focus-visible:ring-electric",
+                    isActive
+                      ? "bg-surface-1 border-electric text-foreground"
+                      : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-surface-1/40",
+                  )}
+                >
+                  <span className="font-mono">{t.title}</span>
+                  <button
+                    type="button"
+                    aria-label={`Close ${t.title}`}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeScript(t.id);
+                    }}
+                    className="size-4 rounded hover:bg-border flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              );
+            })}
+            <button
+              type="button"
+              aria-label="New tab"
+              onClick={() => void createNewScript()}
+              className="h-9 px-2 text-muted-foreground hover:text-electric transition-colors"
+            >
+              <Plus className="size-4" />
+            </button>
+          </div>
+        </div>
+
+        <div className="h-12 px-3 flex items-center gap-2 border-b border-border bg-background">
+          <div className="relative" ref={envRef}>
+            <button
+              type="button"
+              aria-expanded={envOpen}
+              aria-haspopup="listbox"
+              onClick={() => setEnvOpen((o) => !o)}
+              className={cn(
+                "flex items-center gap-2 px-3 h-8 rounded-md bg-surface-1 border border-border text-xs hover:border-electric/60 transition-colors ring-1 ring-transparent",
+                envMeta[env].ring,
+              )}
+            >
+              <span className={cn("size-2 rounded-full", envMeta[env].dot)} />
+              <span className="text-muted-foreground">env:</span>
+              <span className="font-mono">{env}</span>
+              <ChevronDown className="size-3.5 text-muted-foreground" />
+            </button>
+
+            {envOpen && (
               <div
-                key={t.id}
-                onClick={() => setActiveScriptId(t.id)}
-                className={cn(
-                  "group h-9 pl-3 pr-1.5 flex items-center gap-2 text-xs cursor-pointer border-t-2 transition-colors rounded-t-md",
-                  isActive
-                    ? "bg-surface-1 border-electric text-foreground"
-                    : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-surface-1/40",
-                )}
+                role="listbox"
+                className="absolute top-9 left-0 z-20 w-56 bg-popover border border-border rounded-md shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100"
               >
-                <span className="font-mono">{t.title}</span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    if (openTabs.length <= 1) return;
-                    closeScript(t.id);
-                  }}
-                  className="size-4 rounded hover:bg-border flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
-                >
-                  <X className="size-3" />
-                </button>
+                {ENVS.map((e) => (
+                  <button
+                    key={e}
+                    type="button"
+                    role="option"
+                    aria-selected={e === env}
+                    onClick={() => selectEnv(e)}
+                    className="w-full px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-surface-1 transition-colors"
+                  >
+                    <span className={cn("size-2 rounded-full", envMeta[e].dot)} />
+                    <span className="font-mono">{e}</span>
+                    {e === env && <Check className="size-3.5 ml-auto text-electric" />}
+                  </button>
+                ))}
+                <div className="border-t border-border mt-1 pt-1 px-3 pb-1 text-[10px] text-muted-foreground font-mono">
+                  ⌘E to switch
+                </div>
               </div>
-            );
-          })}
-          <button
-            type="button"
-            onClick={() => void createNewScript()}
-            className="h-9 px-2 text-muted-foreground hover:text-electric transition-colors"
-          >
-            <Plus className="size-4" />
-          </button>
-        </div>
-      </div>
-
-      <div className="h-12 px-3 flex items-center gap-2 border-b border-border bg-background">
-        <div className="relative">
-          <button
-            type="button"
-            onClick={() => setEnvOpen((o) => !o)}
-            className={cn(
-              "flex items-center gap-2 px-3 h-8 rounded-md bg-surface-1 border border-border text-xs hover:border-electric/60 transition-colors ring-1 ring-transparent",
-              envMeta[env].ring,
             )}
-          >
-            <span className={cn("size-2 rounded-full", envMeta[env].dot)} />
-            <span className="text-muted-foreground">env:</span>
-            <span className="font-mono">{env}</span>
-            <ChevronDown className="size-3.5 text-muted-foreground" />
-          </button>
+          </div>
 
-          {envOpen && (
-            <div className="absolute top-9 left-0 z-20 w-56 bg-popover border border-border rounded-md shadow-xl py-1 animate-in fade-in zoom-in-95 duration-100">
-              {(["Development", "Staging", "Production"] as Env[]).map((e) => (
-                <button
-                  key={e}
-                  type="button"
-                  onClick={() => {
-                    setEnv(e);
-                    setEnvOpen(false);
-                  }}
-                  className="w-full px-3 py-1.5 text-xs flex items-center gap-2 hover:bg-surface-1 transition-colors"
-                >
-                  <span className={cn("size-2 rounded-full", envMeta[e].dot)} />
-                  <span className="font-mono">{e}</span>
-                  {e === env && <Check className="size-3.5 ml-auto text-electric" />}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+          <div className="h-5 w-px bg-border mx-1" />
 
-        <div className="h-5 w-px bg-border mx-1" />
-
-        <button
-          type="button"
-          onClick={() => void saveActiveScript()}
-          disabled={isSaving || activeScriptId == null}
-          className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors disabled:opacity-50"
-        >
-          {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-          Save
-        </button>
-        <button
-          type="button"
-          className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors"
-        >
-          <Clock className="size-3.5" /> History
-        </button>
-
-        <div className="ml-auto flex items-center gap-2">
-          <span className="text-[11px] text-muted-foreground font-mono">{lineCount} lines</span>
           <button
             type="button"
-            onClick={() => void runActiveQuery()}
-            disabled={isRunning}
-            className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-electric text-primary-foreground text-xs font-semibold hover:brightness-110 transition-all glow-electric disabled:opacity-70"
+            disabled={isSaving}
+            onClick={() => void handleSave()}
+            className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors disabled:opacity-50"
           >
-            {isRunning ? <Loader2 className="size-3.5 animate-spin" /> : <Play className="size-3.5 fill-current" />}
-            Run Query
-            <span className="text-[10px] opacity-70 font-mono pl-1">⌘↵</span>
+            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
+            Save
           </button>
-        </div>
-      </div>
+          <button
+            type="button"
+            onClick={() => setHistoryOpen(true)}
+            className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors"
+          >
+            <Clock className="size-3.5" /> History
+          </button>
 
-      <div className="flex-1 min-h-0 grid grid-rows-2">
-        <div className="border-b border-border min-h-0">
-          <SqlEditor value={draftSql} onChange={setDraftSql} />
-        </div>
-
-        <div className="min-h-0 flex flex-col bg-background">
-          <div className="h-10 px-3 border-b border-border flex items-center gap-2 bg-surface-1/40">
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                className="px-2.5 h-7 text-xs rounded-md bg-surface-1 border border-electric/40 text-electric font-medium"
-              >
-                Results
-              </button>
-              <button
-                type="button"
-                className="px-2.5 h-7 text-xs rounded-md text-muted-foreground hover:bg-surface-1 transition-colors"
-              >
-                Chart
-              </button>
-              <button
-                type="button"
-                className="px-2.5 h-7 text-xs rounded-md text-muted-foreground hover:bg-surface-1 transition-colors"
-              >
-                JSON
-              </button>
-            </div>
-
-            <div className="ml-auto flex items-center gap-2">
-              <span className="text-[11px] text-muted-foreground font-mono">
-                {queryResult
-                  ? `${queryResult.row_count} rows • ${queryResult.duration_ms} ms`
-                  : "Run a query to see results"}
-              </span>
-              <button
-                type="button"
-                onClick={() => setExportOpen(true)}
-                className="flex items-center gap-1.5 h-7 px-3 rounded-md bg-neon/10 border border-neon/40 text-neon text-xs font-medium hover:bg-neon/20 transition-colors"
-              >
-                <Download className="size-3.5" /> Smart Export
-              </button>
-            </div>
-          </div>
-
-          <div className="flex-1 min-h-0">
-            <ResultsGrid result={queryResult} />
+          <div className="ml-auto flex items-center gap-2">
+            <span className="text-[11px] text-muted-foreground font-mono">
+              {draftSql.split("\n").length} lines
+            </span>
+            <button
+              type="button"
+              disabled={executeMutation.isPending}
+              onClick={runQuery}
+              className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-electric text-primary-foreground text-xs font-semibold hover:brightness-110 transition-all glow-electric disabled:opacity-60"
+            >
+              {executeMutation.isPending ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Play className="size-3.5 fill-current" />
+              )}
+              Run Query
+              <span className="text-[10px] opacity-70 font-mono pl-1">⌘↵</span>
+            </button>
           </div>
         </div>
-      </div>
 
-      <ExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
-    </main>
+        <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0" id="kueri-editor-results">
+          <ResizablePanel defaultSize={50} minSize={20}>
+            <SqlEditor value={draftSql} onChange={setDraftSql} />
+          </ResizablePanel>
+          <ResizableHandle withHandle />
+          <ResizablePanel defaultSize={50} minSize={20}>
+            <div className="h-full min-h-0 flex flex-col bg-background">
+              <div className="h-10 px-3 border-b border-border flex items-center gap-2 bg-surface-1/40">
+                <div className="flex items-center gap-1" role="tablist" aria-label="Result view">
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={resultsView === "results"}
+                    onClick={() => setResultsView("results")}
+                    className={cn(
+                      "px-2.5 h-7 text-xs rounded-md transition-colors",
+                      resultsView === "results"
+                        ? "bg-surface-1 border border-electric/40 text-electric font-medium"
+                        : "text-muted-foreground hover:bg-surface-1",
+                    )}
+                  >
+                    Results
+                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span>
+                        <button
+                          type="button"
+                          disabled
+                          className="px-2.5 h-7 text-xs rounded-md text-muted-foreground/50 cursor-not-allowed"
+                        >
+                          Chart
+                        </button>
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Coming soon</TooltipContent>
+                  </Tooltip>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={resultsView === "json"}
+                    onClick={() => setResultsView("json")}
+                    className={cn(
+                      "px-2.5 h-7 text-xs rounded-md transition-colors",
+                      resultsView === "json"
+                        ? "bg-surface-1 border border-electric/40 text-electric font-medium"
+                        : "text-muted-foreground hover:bg-surface-1",
+                    )}
+                  >
+                    JSON
+                  </button>
+                </div>
+
+                <div className="ml-auto flex items-center gap-2">
+                  {metaLabel && (
+                    <span className="text-[11px] text-muted-foreground font-mono">{metaLabel}</span>
+                  )}
+                  <button
+                    type="button"
+                    disabled={!lastResult}
+                    onClick={() => setExportOpen(true)}
+                    className="flex items-center gap-1.5 h-7 px-3 rounded-md bg-neon/10 border border-neon/40 text-neon text-xs font-medium hover:bg-neon/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Download className="size-3.5" /> Smart Export
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex-1 min-h-0">
+                {resultsView === "results" ? (
+                  <ResultsGrid
+                    result={lastResult}
+                    isLoading={executeMutation.isPending}
+                    error={lastQueryError}
+                  />
+                ) : (
+                  <JsonResultsView result={lastResult} />
+                )}
+              </div>
+            </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+
+        <ExportModal
+          open={exportOpen}
+          onOpenChange={setExportOpen}
+          sql={draftSql}
+          title={activeTitle}
+        />
+        <QueryHistorySheet
+          open={historyOpen}
+          onOpenChange={setHistoryOpen}
+          onPickSql={setDraftSql}
+        />
+        <ProductionEnvDialog
+          open={prodDialogOpen}
+          onOpenChange={setProdDialogOpen}
+          onConfirm={() => {
+            setEnv("Production");
+            setProdDialogOpen(false);
+          }}
+        />
+      </main>
+    </TooltipProvider>
   );
 }

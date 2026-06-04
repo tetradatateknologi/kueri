@@ -34,6 +34,12 @@ func BadRequest(c echo.Context, message string) error {
 	})
 }
 
+func QueryError(c echo.Context, message string) error {
+	return c.JSON(http.StatusBadRequest, ErrorResponse{
+		Error: ErrorBody{Code: "QUERY_ERROR", Message: message},
+	})
+}
+
 func NotFound(c echo.Context, message string) error {
 	return c.JSON(http.StatusNotFound, ErrorResponse{
 		Error: ErrorBody{Code: "NOT_FOUND", Message: message},

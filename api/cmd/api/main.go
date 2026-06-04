@@ -18,6 +18,7 @@ import (
 	"github.com/tetradatateknologi/kueri/api/internal/http/middleware"
 	"github.com/tetradatateknologi/kueri/api/internal/logger"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/health"
+	"github.com/tetradatateknologi/kueri/api/internal/modules/query"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/me"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/script"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/workspace"
@@ -76,6 +77,7 @@ func newRouter(cfg *config.Config, pool *pgxpool.Pool) *echo.Echo {
 	e.Use(middleware.CORS(cfg.CORS.AllowedOrigins))
 
 	health.RegisterRoutes(e)
+	query.RegisterRoutes(e)
 
 	api := e.Group("/api/v1")
 	api.Use(middleware.DevUser(pool, cfg.Dev.UserEmail))

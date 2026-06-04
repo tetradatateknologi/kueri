@@ -1,55 +1,33 @@
-import { useEffect, useState } from "react";
-import { fetchHealth, fetchPing } from "@/lib/api/client";
-
-type ApiState =
-  | { kind: "loading" }
-  | { kind: "ok"; health: string; ping: string }
-  | { kind: "error"; message: string };
+import { useHealthQuery, usePingQuery } from "@/lib/api/queries";
 
 export function ApiStatus() {
-  const [state, setState] = useState<ApiState>({ kind: "loading" });
+  if (!import.meta.env.DEV) {
+    return null;
+  }
 
-  useEffect(() => {
-    let cancelled = false;
+  const health = useHealthQuery();
+  const ping = usePingQuery();
 
-    async function load() {
-      try {
-        const [health, ping] = await Promise.all([fetchHealth(), fetchPing()]);
-        if (!cancelled) {
-          setState({
-            kind: "ok",
-            health: health.status,
-            ping: ping.message,
-          });
-        }
-      } catch (err) {
-        if (!cancelled) {
-          setState({
-            kind: "error",
-            message: err instanceof Error ? err.message : "API unreachable",
-          });
-        }
-      }
-    }
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  const loading = health.isLoading || ping.isLoading;
+  const error = health.error ?? ping.error;
+  const ok = health.data && ping.data;
 
   return (
     <div
       className="fixed bottom-3 right-3 z-50 rounded-md border border-border bg-card/95 px-3 py-2 text-xs text-muted-foreground shadow-md backdrop-blur"
       aria-live="polite"
     >
-      {state.kind === "loading" && <span>API: checking…</span>}
-      {state.kind === "ok" && (
-        <span>
-          API: health={state.health}, ping={state.ping}
+      {loading && <span>API: checking…</span>}
+      {error && !loading && (
+        <span className="text-destructive">
+          API: {error instanceof Error ? error.message : "unreachable"}
         </span>
       )}
-      {state.kind === "error" && <span className="text-destructive">API: {state.message}</span>}
+      {ok && !loading && !error && (
+        <span>
+          API: health={health.data.status}, ping={ping.data.message}
+        </span>
+      )}
     </div>
   );
 }

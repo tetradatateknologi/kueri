@@ -2,6 +2,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { ApiStatus } from "@/components/ApiStatus";
 import { Sidebar } from "@/components/kueri/Sidebar";
 import { Workspace } from "@/components/kueri/Workspace";
+import { Toaster } from "@/components/ui/sonner";
 import { KueriAppProvider } from "@/context/kueri-app";
 
 const queryClient = new QueryClient({
@@ -19,6 +20,7 @@ export default function App() {
           <Workspace />
           <ApiStatus />
         </div>
+        <Toaster />
       </KueriAppProvider>
     </QueryClientProvider>
   );
