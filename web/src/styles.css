@@ -38,6 +38,7 @@
   --color-env-prod: var(--env-prod);
   --color-surface-1: var(--surface-1);
   --color-surface-2: var(--surface-2);
+  --color-skeleton: var(--skeleton);
   --color-syntax-keyword: var(--syntax-keyword);
   --color-syntax-string: var(--syntax-string);
   --color-syntax-number: var(--syntax-number);
@@ -72,6 +73,8 @@
 
   --muted: oklch(0.26 0.013 250);
   --muted-foreground: oklch(0.62 0.015 250);
+  /* Neutral grey loading placeholders (no brand tint) */
+  --skeleton: oklch(0.32 0.006 264);
 
   --destructive: oklch(0.65 0.22 27);
   --destructive-foreground: oklch(0.98 0.01 250);
