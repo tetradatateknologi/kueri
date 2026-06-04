@@ -1,4 +1,4 @@
-.PHONY: dev dev-api dev-web install docker-up docker-down desktop-prepare desktop-build desktop-dev release-manifest
+.PHONY: dev dev-api dev-web install docker-up docker-down desktop-prepare desktop-build desktop-dev release-manifest bump-version
 
 VERSION := $(shell tr -d '[:space:]' < VERSION)
 
@@ -36,3 +36,7 @@ desktop-dev: desktop-build
 release-manifest:
 	@test -n "$(ARTIFACT_DIR)" || (echo "Usage: make release-manifest ARTIFACT_DIR=dist/release" && exit 1)
 	@./scripts/gen-release-manifest.sh "$(ARTIFACT_DIR)"
+
+bump-version:
+	@test -n "$(BUMP)" || (echo "Usage: make bump-version BUMP=patch|minor|major" && exit 1)
+	@./scripts/bump-version.sh "$(BUMP)"

@@ -1,0 +1,117 @@
+name: Release Trigger
+
+# Creates git tag v{VERSION} automatically — no manual `git tag` needed.
+# Tag push then triggers `.github/workflows/release.yml` to build & publish.
+#
+# Triggers:
+#   1. Push to main that changes VERSION (after merge / direct commit)
+#   2. workflow_dispatch — bump patch/minor/major or retry tag from VERSION
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - VERSION
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Bump VERSION before release (none = use current VERSION)
+        type: choice
+        options:
+          - none
+          - patch
+          - minor
+          - major
+        default: none
+      version:
+        description: Explicit version (e.g. 0.2.0). Overrides bump.
+        required: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-trigger-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Bump version (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch' && inputs.bump != 'none'
+        run: ./scripts/bump-version.sh "${{ inputs.bump }}"
+
+      - name: Set explicit version (workflow_dispatch)
+        if: github.event_name == 'workflow_dispatch' && inputs.version != ''
+        run: ./scripts/bump-version.py --set "${{ inputs.version }}"
+
+      - name: Commit version bump if needed
+        id: commit
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if git diff --quiet -- VERSION api/VERSION web/VERSION web/package.json; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          git add VERSION api/VERSION web/VERSION web/package.json
+          git commit -m "chore: bump version to ${VERSION}"
+          git push origin HEAD:main
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+      - name: Read version
+        id: ver
+        shell: bash
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          echo "value=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=v${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Validate semver
+        shell: bash
+        run: |
+          if ! [[ "${{ steps.ver.outputs.value }}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "VERSION must be semver (x.y.z), got: ${{ steps.ver.outputs.value }}" >&2
+            exit 1
+          fi
+
+      - name: Create and push tag
+        env:
+          TAG: ${{ steps.ver.outputs.tag }}
+          VERSION: ${{ steps.ver.outputs.value }}
+        shell: bash
+        run: |
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists — skipping."
+            exit 0
+          fi
+
+          git tag -a "$TAG" -m "Release $TAG"
+          git push origin "$TAG"
+          echo "Created and pushed $TAG"
+
+      - name: Summary
+        shell: bash
+        run: |
+          {
+            echo "## Release trigger"
+            echo ""
+            echo "- Version: \`${{ steps.ver.outputs.value }}\`"
+            echo "- Tag: \`${{ steps.ver.outputs.tag }}\`"
+            echo "- Version bump committed: \`${{ steps.commit.outputs.changed || 'false' }}\`"
+            echo ""
+            echo "Build & publish runs in the **Release** workflow after the tag push."
+          } >> "$GITHUB_STEP_SUMMARY"

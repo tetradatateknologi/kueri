@@ -1,5 +1,8 @@
 name: Release
 
+# Builds desktop binaries and publishes GitHub Release.
+# Triggered automatically after Release Trigger creates tag v*.
+
 on:
   push:
     tags:
