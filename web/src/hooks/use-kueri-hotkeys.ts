@@ -8,6 +8,8 @@ export type KueriHotkeyHandlers = {
   onNewTab: () => void;
   onCloseTab: () => void;
   onEditScript: () => void;
+  onRenameScript: () => void;
+  onToggleFavorite: () => void;
   onHistory: () => void;
   onExport: () => void;
   onFocusSidebarSearch: () => void;
@@ -35,6 +37,12 @@ export function useKueriHotkeys(handlers: KueriHotkeyHandlers) {
 
       if (shouldIgnoreWorkspaceHotkey(e)) return;
 
+      if (e.key === "F2" && !isModKey(e) && !e.altKey) {
+        e.preventDefault();
+        h.onRenameScript();
+        return;
+      }
+
       const mod = isModKey(e);
 
       if (mod && e.key === "Enter") {
@@ -46,6 +54,12 @@ export function useKueriHotkeys(handlers: KueriHotkeyHandlers) {
       if (!mod) return;
 
       const key = e.key.toLowerCase();
+
+      if (key === "b" && e.shiftKey) {
+        e.preventDefault();
+        h.onToggleFavorite();
+        return;
+      }
 
       if (key === "s" && e.shiftKey) {
         e.preventDefault();

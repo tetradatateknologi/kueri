@@ -93,6 +93,29 @@ func (h *Handler) Delete(c echo.Context) error {
 	return apphttp.Success(c, DeleteScriptResponse{Deleted: true})
 }
 
+func (h *Handler) SetFavorite(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil {
+		return apphttp.BadRequest(c, "Invalid script ID")
+	}
+	var req SetFavoriteRequest
+	if err := c.Bind(&req); err != nil {
+		return apphttp.BadRequest(c, "Invalid request body")
+	}
+	script, err := h.svc.SetFavorite(c.Request().Context(), user.ID, id, req.Favorite)
+	if err != nil {
+		if errors.Is(err, ErrScriptNotFound) {
+			return apphttp.NotFound(c, "Script not found")
+		}
+		return apphttp.InternalError(c, "Failed to update favorite", err)
+	}
+	return apphttp.Success(c, script)
+}
+
 func (h *Handler) Create(c echo.Context) error {
 	user, ok := middleware.UserFromContext(c.Request().Context())
 	if !ok {

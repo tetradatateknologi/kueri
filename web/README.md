@@ -33,6 +33,9 @@ Press `?` in the workspace or open **Settings** in the sidebar for the full guid
 |----------|--------|
 | ⌘↵ / Ctrl+Enter | Run query |
 | ⌘S / Ctrl+S | Save script |
+| F2 | Rename active script |
+| ⌘⇧S / Ctrl+Shift+S | Edit script name & tags |
+| ⌘⇧B / Ctrl+Shift+B | Toggle favorite on active script |
 | ⌘N / Ctrl+N | New script tab |
 | ⌘W / Ctrl+W | Close active tab |
 | ⌘H / Ctrl+H | Query history |

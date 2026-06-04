@@ -11,6 +11,8 @@ import {
 } from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/kueri/ConfirmDeleteDialog";
+import { FavoritesSection } from "@/components/kueri/FavoritesSection";
+import { ScriptFavoriteButton } from "@/components/kueri/ScriptFavoriteButton";
 import { CreateConnectionDialog } from "@/components/kueri/CreateConnectionDialog";
 import { CreateWorkspaceDialog } from "@/components/kueri/CreateWorkspaceDialog";
 import { RenameDialog } from "@/components/kueri/RenameDialog";
@@ -74,8 +76,18 @@ type DeleteTarget =
 
 export function Sidebar() {
   const queryClient = useQueryClient();
-  const { workspaces, scripts, isLoading, openScript, closeScript, createNewScript, openEditScript } =
-    useKueriApp();
+  const {
+    workspaces,
+    scripts,
+    favoriteScripts,
+    isLoading,
+    isTogglingFavorite,
+    openScript,
+    closeScript,
+    createNewScript,
+    openEditScript,
+    toggleFavorite,
+  } = useKueriApp();
   const hasHydrated = useWorkspaceStore((s) => s._hasHydrated);
   const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
   const setSelectedConnection = useWorkspaceStore((s) => s.setSelectedConnection);
@@ -264,6 +276,14 @@ export function Sidebar() {
             <SidebarSectionSkeleton />
           ) : (
             <>
+              <FavoritesSection
+                favorites={favoriteScripts}
+                onOpenScript={openScript}
+                onToggleFavorite={toggleFavorite}
+                onEditScript={openEditScript}
+                onDeleteScript={(s) => setDeleteTarget({ kind: "script", id: s.id, name: s.title })}
+                isTogglingFavorite={isTogglingFavorite}
+              />
               <div>
                 <div className="px-2 flex items-center justify-between mb-1.5">
                   <span className="text-[10px] uppercase tracking-[0.14em] text-muted-foreground font-semibold">
@@ -399,6 +419,12 @@ export function Sidebar() {
                                           </div>
                                         )}
                                       </button>
+                                      <ScriptFavoriteButton
+                                        isFavorite={s.is_favorite}
+                                        disabled={isTogglingFavorite}
+                                        onToggle={() => toggleFavorite(s.id)}
+                                        className="mt-1"
+                                      />
                                       <SidebarItemMenu
                                         className="mt-1"
                                         onEdit={() => openEditScript(s.id)}

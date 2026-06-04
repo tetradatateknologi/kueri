@@ -12,7 +12,7 @@ import (
 const createSavedScript = `-- name: CreateSavedScript :one
 INSERT INTO saved_scripts (workspace_id, user_id, title, sql_text)
 VALUES ($1, $2, $3, $4)
-RETURNING id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at
+RETURNING id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at, is_favorite, favorite_sort
 `
 
 type CreateSavedScriptParams struct {
@@ -39,6 +39,8 @@ func (q *Queries) CreateSavedScript(ctx context.Context, arg CreateSavedScriptPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.IsFavorite,
+		&i.FavoriteSort,
 	)
 	return i, err
 }
@@ -54,7 +56,7 @@ func (q *Queries) DeleteScriptTagsForScript(ctx context.Context, scriptID int64)
 }
 
 const getSavedScriptByID = `-- name: GetSavedScriptByID :one
-SELECT id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at
+SELECT id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at, is_favorite, favorite_sort
 FROM saved_scripts
 WHERE id = $1
   AND deleted_at IS NULL
@@ -72,6 +74,8 @@ func (q *Queries) GetSavedScriptByID(ctx context.Context, id int64) (SavedScript
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.IsFavorite,
+		&i.FavoriteSort,
 	)
 	return i, err
 }
@@ -93,7 +97,7 @@ func (q *Queries) LinkScriptTag(ctx context.Context, arg LinkScriptTagParams) er
 }
 
 const listSavedScriptsByUser = `-- name: ListSavedScriptsByUser :many
-SELECT s.id, s.workspace_id, s.user_id, s.title, s.sql_text, s.created_at, s.updated_at, s.deleted_at
+SELECT s.id, s.workspace_id, s.user_id, s.title, s.sql_text, s.created_at, s.updated_at, s.deleted_at, s.is_favorite, s.favorite_sort
 FROM saved_scripts s
 INNER JOIN workspaces w ON w.id = s.workspace_id
 WHERE w.user_id = $1
@@ -120,6 +124,8 @@ func (q *Queries) ListSavedScriptsByUser(ctx context.Context, userID int64) ([]S
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.IsFavorite,
+			&i.FavoriteSort,
 		); err != nil {
 			return nil, err
 		}
@@ -132,7 +138,7 @@ func (q *Queries) ListSavedScriptsByUser(ctx context.Context, userID int64) ([]S
 }
 
 const listSavedScriptsByWorkspace = `-- name: ListSavedScriptsByWorkspace :many
-SELECT id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at
+SELECT id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at, is_favorite, favorite_sort
 FROM saved_scripts
 WHERE workspace_id = $1
   AND deleted_at IS NULL
@@ -157,6 +163,8 @@ func (q *Queries) ListSavedScriptsByWorkspace(ctx context.Context, workspaceID i
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.DeletedAt,
+			&i.IsFavorite,
+			&i.FavoriteSort,
 		); err != nil {
 			return nil, err
 		}
@@ -196,6 +204,55 @@ func (q *Queries) ListTagsForScript(ctx context.Context, scriptID int64) ([]Scri
 	return items, nil
 }
 
+const maxFavoriteSortForUser = `-- name: MaxFavoriteSortForUser :one
+SELECT COALESCE(MAX(favorite_sort), 0)::int AS max_sort
+FROM saved_scripts
+WHERE user_id = $1
+  AND is_favorite = TRUE
+  AND deleted_at IS NULL
+`
+
+func (q *Queries) MaxFavoriteSortForUser(ctx context.Context, userID int64) (int32, error) {
+	row := q.db.QueryRow(ctx, maxFavoriteSortForUser, userID)
+	var max_sort int32
+	err := row.Scan(&max_sort)
+	return max_sort, err
+}
+
+const setScriptFavorite = `-- name: SetScriptFavorite :one
+UPDATE saved_scripts
+SET is_favorite = $2,
+    favorite_sort = $3,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at, is_favorite, favorite_sort
+`
+
+type SetScriptFavoriteParams struct {
+	ID           int64  `json:"id"`
+	IsFavorite   bool   `json:"is_favorite"`
+	FavoriteSort *int32 `json:"favorite_sort"`
+}
+
+func (q *Queries) SetScriptFavorite(ctx context.Context, arg SetScriptFavoriteParams) (SavedScript, error) {
+	row := q.db.QueryRow(ctx, setScriptFavorite, arg.ID, arg.IsFavorite, arg.FavoriteSort)
+	var i SavedScript
+	err := row.Scan(
+		&i.ID,
+		&i.WorkspaceID,
+		&i.UserID,
+		&i.Title,
+		&i.SqlText,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.DeletedAt,
+		&i.IsFavorite,
+		&i.FavoriteSort,
+	)
+	return i, err
+}
+
 const softDeleteSavedScript = `-- name: SoftDeleteSavedScript :exec
 UPDATE saved_scripts
 SET deleted_at = NOW(),
@@ -216,7 +273,7 @@ SET title = $2,
     updated_at = NOW()
 WHERE id = $1
   AND deleted_at IS NULL
-RETURNING id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at
+RETURNING id, workspace_id, user_id, title, sql_text, created_at, updated_at, deleted_at, is_favorite, favorite_sort
 `
 
 type UpdateSavedScriptParams struct {
@@ -237,6 +294,8 @@ func (q *Queries) UpdateSavedScript(ctx context.Context, arg UpdateSavedScriptPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.DeletedAt,
+		&i.IsFavorite,
+		&i.FavoriteSort,
 	)
 	return i, err
 }

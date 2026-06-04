@@ -6,11 +6,17 @@ type TagResponse struct {
 }
 
 type ScriptResponse struct {
-	ID          int64         `json:"id"`
-	WorkspaceID int64         `json:"workspace_id"`
-	Title       string        `json:"title"`
-	SqlText     string        `json:"sql_text"`
-	Tags        []TagResponse `json:"tags"`
+	ID           int64         `json:"id"`
+	WorkspaceID  int64         `json:"workspace_id"`
+	Title        string        `json:"title"`
+	SqlText      string        `json:"sql_text"`
+	Tags         []TagResponse `json:"tags"`
+	IsFavorite   bool          `json:"is_favorite"`
+	FavoriteSort *int32        `json:"favorite_sort,omitempty"`
+}
+
+type SetFavoriteRequest struct {
+	Favorite bool `json:"favorite"`
 }
 
 type DeleteScriptResponse struct {

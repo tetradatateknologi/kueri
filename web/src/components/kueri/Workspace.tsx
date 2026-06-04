@@ -47,11 +47,13 @@ export function Workspace() {
   const {
     workspaces,
     scripts,
+    favoriteScripts,
     openScriptIds,
     activeScriptId,
     activeScript,
     draftSql,
     setDraftSql,
+    openScript,
     closeScript,
     setActiveScriptId,
     saveActiveScript,
@@ -59,6 +61,8 @@ export function Workspace() {
     isLoading,
     createNewScript,
     openEditScript,
+    openRenameScript,
+    toggleFavorite,
   } = useKueriApp();
 
   const env = useWorkspaceStore((s) => s.env);
@@ -189,6 +193,12 @@ export function Workspace() {
       onEditScript: () => {
         if (activeScriptId != null) openEditScript(activeScriptId);
       },
+      onRenameScript: () => {
+        if (activeScriptId != null) openRenameScript(activeScriptId);
+      },
+      onToggleFavorite: () => {
+        if (activeScriptId != null) toggleFavorite(activeScriptId);
+      },
       onHistory: () => setHistoryOpen(true),
       onExport: () => {
         if (lastResult) setExportOpen(true);
@@ -220,6 +230,8 @@ export function Workspace() {
       closeScript,
       createNewScript,
       openEditScript,
+      openRenameScript,
+      toggleFavorite,
       openScriptIds,
       setActiveScriptId,
       lastResult,
@@ -405,7 +417,11 @@ export function Workspace() {
             {hasOpenTab ? (
               <EditorPane value={draftSql} onChange={setDraftSql} onRun={runQuery} />
             ) : (
-              <EditorEmptyState onCreateScript={() => void createNewScript()} />
+              <EditorEmptyState
+                favorites={favoriteScripts}
+                onCreateScript={() => void createNewScript()}
+                onOpenScript={openScript}
+              />
             )}
           </ResizablePanel>
           <ResizableHandle withHandle />

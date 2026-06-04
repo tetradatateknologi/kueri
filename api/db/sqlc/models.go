@@ -115,14 +115,16 @@ type Connection struct {
 }
 
 type SavedScript struct {
-	ID          int64              `json:"id"`
-	WorkspaceID int64              `json:"workspace_id"`
-	UserID      int64              `json:"user_id"`
-	Title       string             `json:"title"`
-	SqlText     string             `json:"sql_text"`
-	CreatedAt   pgtype.Timestamptz `json:"created_at"`
-	UpdatedAt   pgtype.Timestamptz `json:"updated_at"`
-	DeletedAt   pgtype.Timestamptz `json:"deleted_at"`
+	ID           int64              `json:"id"`
+	WorkspaceID  int64              `json:"workspace_id"`
+	UserID       int64              `json:"user_id"`
+	Title        string             `json:"title"`
+	SqlText      string             `json:"sql_text"`
+	CreatedAt    pgtype.Timestamptz `json:"created_at"`
+	UpdatedAt    pgtype.Timestamptz `json:"updated_at"`
+	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
+	IsFavorite   bool               `json:"is_favorite"`
+	FavoriteSort *int32             `json:"favorite_sort"`
 }
 
 type SavedScriptTag struct {

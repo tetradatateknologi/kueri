@@ -16,6 +16,7 @@ Aligned with [`one/api/db`](../../reference/one/api/db).
 | 000002 | `create_workspaces` | `workspaces` |
 | 000003 | `create_connections` | `connections` (+ enums) |
 | 000004 | `create_saved_scripts` | `saved_scripts`, `script_tags`, `saved_script_tags` |
+| 000005 | `add_script_favorites` | `saved_scripts.is_favorite`, `saved_scripts.favorite_sort` |
 
 ## Dev seed
 

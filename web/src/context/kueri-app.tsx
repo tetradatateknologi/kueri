@@ -13,22 +13,32 @@ import {
   EditScriptDialog,
   type EditScriptFormValues,
 } from "@/components/kueri/EditScriptDialog";
+import { RenameDialog } from "@/components/kueri/RenameDialog";
 import { ApiError } from "@/lib/api/http";
 import { getMe } from "@/lib/api/me";
-import { createScript, getScript, listScripts, updateScript } from "@/lib/api/scripts";
+import { createScript, getScript, listScripts, setScriptFavorite, updateScript } from "@/lib/api/scripts";
+import { getFavoriteScripts } from "@/lib/favorite-scripts";
 import { showSuccess, showValidationError } from "@/lib/toasts";
 import type { Script, User, Workspace } from "@/lib/api/types";
-import { generateNewScriptTitle, isReservedScriptTitle } from "@/lib/script-title";
+import {
+  generateNewScriptTitle,
+  isReservedScriptTitle,
+  stripScriptTitleExtension,
+  toScriptTitle,
+} from "@/lib/script-title";
 import { listWorkspaces } from "@/lib/api/workspaces";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 type EditScriptTarget = { id: number; title: string; tags: string[] };
+type RenameScriptTarget = { id: number; title: string; tags: string[] };
 
 type KueriAppContextValue = {
   me: User | undefined;
   workspaces: Workspace[];
   scripts: Script[];
+  favoriteScripts: Script[];
   isLoading: boolean;
+  isTogglingFavorite: boolean;
   error: Error | null;
   openScriptIds: number[];
   activeScriptId: number | null;
@@ -43,6 +53,8 @@ type KueriAppContextValue = {
   refetchAll: () => void;
   createNewScript: (workspaceId?: number) => Promise<void>;
   openEditScript: (id: number) => void;
+  openRenameScript: (id: number) => void;
+  toggleFavorite: (id: number) => void;
 };
 
 const KueriAppContext = createContext<KueriAppContextValue | null>(null);
@@ -54,6 +66,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   const [draftSql, setDraftSqlState] = useState("");
   const draftByScriptIdRef = useRef<Record<number, string>>({});
   const [editScriptTarget, setEditScriptTarget] = useState<EditScriptTarget | null>(null);
+  const [renameScriptTarget, setRenameScriptTarget] = useState<RenameScriptTarget | null>(null);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe });
   const workspacesQuery = useQuery({ queryKey: ["workspaces"], queryFn: listWorkspaces });
@@ -133,6 +146,51 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const favoriteMutation = useMutation({
+    mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) => setScriptFavorite(id, favorite),
+    onMutate: async ({ id, favorite }) => {
+      await queryClient.cancelQueries({ queryKey: ["scripts"] });
+      const prev = queryClient.getQueryData<Script[]>(["scripts"]);
+      queryClient.setQueryData<Script[]>(["scripts"], (old) =>
+        (old ?? []).map((s) =>
+          s.id === id ? { ...s, is_favorite: favorite, favorite_sort: favorite ? 999 : null } : s,
+        ),
+      );
+      return { prev };
+    },
+    onError: (err, _vars, ctx) => {
+      if (ctx?.prev) queryClient.setQueryData(["scripts"], ctx.prev);
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Request failed";
+      showValidationError(message);
+    },
+    onSuccess: (script) => {
+      queryClient.setQueryData<Script[]>(["scripts"], (old) =>
+        (old ?? []).map((s) => (s.id === script.id ? script : s)),
+      );
+      queryClient.setQueryData(["script", script.id], script);
+      showSuccess(
+        script.is_favorite ? `Added "${script.title}" to favorites` : `Removed "${script.title}" from favorites`,
+      );
+    },
+  });
+
+  const renameScriptMutation = useMutation({
+    mutationFn: async (target: RenameScriptTarget & { title: string }) =>
+      updateScript(target.id, { title: target.title, tags: target.tags }),
+    onSuccess: async (script, variables) => {
+      await queryClient.invalidateQueries({ queryKey: ["scripts"] });
+      queryClient.setQueryData(["script", variables.id], script);
+      showSuccess(`Renamed to "${script.title}"`);
+      setRenameScriptTarget(null);
+    },
+    onError: (err) => {
+      const message =
+        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Request failed";
+      showValidationError(message);
+    },
+  });
+
   const editScriptMutation = useMutation({
     mutationFn: async (target: EditScriptTarget & EditScriptFormValues) =>
       updateScript(target.id, { title: target.title, tags: target.tags }),
@@ -150,20 +208,52 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   });
 
   const scripts = scriptsQuery.data ?? [];
+  const favoriteScripts = useMemo(() => getFavoriteScripts(scripts), [scripts]);
 
-  const openEditScript = useCallback(
+  const toggleFavorite = useCallback(
+    (id: number) => {
+      const script = scripts.find((s) => s.id === id);
+      if (!script || favoriteMutation.isPending) return;
+      favoriteMutation.mutate({ id, favorite: !script.is_favorite });
+    },
+    [scripts, favoriteMutation],
+  );
+
+  const resolveScript = useCallback(
     (id: number) => {
       const fromList = scripts.find((s) => s.id === id);
       const fromActive = activeScriptQuery.data?.id === id ? activeScriptQuery.data : undefined;
-      const script = fromList ?? fromActive;
+      return fromList ?? fromActive;
+    },
+    [scripts, activeScriptQuery.data],
+  );
+
+  const openEditScript = useCallback(
+    (id: number) => {
+      const script = resolveScript(id);
       if (!script) return;
+      setRenameScriptTarget(null);
       setEditScriptTarget({
         id: script.id,
         title: script.title,
         tags: script.tags.map((t) => t.name),
       });
     },
-    [scripts, activeScriptQuery.data],
+    [resolveScript],
+  );
+
+  const openRenameScript = useCallback(
+    (id: number) => {
+      const script = resolveScript(id);
+      if (!script) return;
+      setEditScriptTarget(null);
+      setRenameScriptTarget({
+        id: script.id,
+        title: script.title,
+        tags: script.tags.map((t) => t.name),
+      });
+    },
+    [resolveScript],
   );
 
   const openScript = useCallback(
@@ -243,7 +333,9 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       me: meQuery.data,
       workspaces: workspacesQuery.data ?? [],
       scripts,
+      favoriteScripts,
       isLoading,
+      isTogglingFavorite: favoriteMutation.isPending,
       error,
       openScriptIds,
       activeScriptId,
@@ -261,12 +353,16 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       refetchAll,
       createNewScript,
       openEditScript,
+      openRenameScript,
+      toggleFavorite,
     }),
     [
       meQuery.data,
       workspacesQuery.data,
       scripts,
+      favoriteScripts,
       isLoading,
+      favoriteMutation.isPending,
       error,
       openScriptIds,
       activeScriptId,
@@ -279,12 +375,40 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       refetchAll,
       createNewScript,
       openEditScript,
+      openRenameScript,
+      toggleFavorite,
     ],
   );
 
   return (
     <KueriAppContext.Provider value={value}>
       {children}
+      {renameScriptTarget && (
+        <RenameDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setRenameScriptTarget(null);
+          }}
+          title="Rename script"
+          description="Update the name shown in the sidebar and editor tabs."
+          label="Script name"
+          initialName={stripScriptTitleExtension(renameScriptTarget.title)}
+          placeholder="my-query"
+          isPending={renameScriptMutation.isPending}
+          onSubmit={(name) => {
+            if (!name) {
+              showValidationError("Script name is required");
+              return;
+            }
+            const title = toScriptTitle(name);
+            if (isReservedScriptTitle(title)) {
+              showValidationError("Choose a name other than untitled");
+              return;
+            }
+            renameScriptMutation.mutate({ ...renameScriptTarget, title });
+          }}
+        />
+      )}
       {editScriptTarget && (
         <EditScriptDialog
           open

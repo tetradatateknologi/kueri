@@ -35,6 +35,8 @@ export type Script = {
   title: string;
   sql_text: string;
   tags: ScriptTag[];
+  is_favorite: boolean;
+  favorite_sort?: number | null;
 };
 
 export type QueryRunResult = {

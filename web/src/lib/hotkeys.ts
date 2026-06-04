@@ -34,6 +34,9 @@ export function isMac(): boolean {
 /** e.g. "⌘S" or "Ctrl+S" */
 export function formatShortcut(key: string, modifiers?: { shift?: boolean; alt?: boolean }): string {
   const mac = isMac();
+  if (key === "F2") {
+    return "F2";
+  }
   if (key === "Enter") {
     return mac ? "⌘↵" : "Ctrl+Enter";
   }

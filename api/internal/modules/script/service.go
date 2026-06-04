@@ -117,6 +117,39 @@ func (s *Service) Delete(ctx context.Context, userID, scriptID int64) error {
 	return s.q.SoftDeleteSavedScript(ctx, scriptID)
 }
 
+func (s *Service) SetFavorite(ctx context.Context, userID, scriptID int64, favorite bool) (ScriptResponse, error) {
+	sc, err := s.q.GetSavedScriptByID(ctx, scriptID)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return ScriptResponse{}, ErrScriptNotFound
+		}
+		return ScriptResponse{}, err
+	}
+	if err := s.ensureScriptOwner(ctx, userID, sc.WorkspaceID); err != nil {
+		return ScriptResponse{}, err
+	}
+
+	var sort *int32
+	if favorite {
+		max, err := s.q.MaxFavoriteSortForUser(ctx, userID)
+		if err != nil {
+			return ScriptResponse{}, err
+		}
+		next := max + 1
+		sort = &next
+	}
+
+	updated, err := s.q.SetScriptFavorite(ctx, sqlc.SetScriptFavoriteParams{
+		ID:           scriptID,
+		IsFavorite:   favorite,
+		FavoriteSort: sort,
+	})
+	if err != nil {
+		return ScriptResponse{}, err
+	}
+	return s.mapScript(ctx, updated)
+}
+
 func (s *Service) mapScript(ctx context.Context, sc sqlc.SavedScript) (ScriptResponse, error) {
 	tags, err := s.q.ListTagsForScript(ctx, sc.ID)
 	if err != nil {
@@ -127,11 +160,13 @@ func (s *Service) mapScript(ctx context.Context, sc sqlc.SavedScript) (ScriptRes
 		tagResponses = append(tagResponses, TagResponse{Name: t.Name, Color: tagColor(t.Name)})
 	}
 	return ScriptResponse{
-		ID:          sc.ID,
-		WorkspaceID: sc.WorkspaceID,
-		Title:       sc.Title,
-		SqlText:     sc.SqlText,
-		Tags:        tagResponses,
+		ID:           sc.ID,
+		WorkspaceID:  sc.WorkspaceID,
+		Title:        sc.Title,
+		SqlText:      sc.SqlText,
+		Tags:         tagResponses,
+		IsFavorite:   sc.IsFavorite,
+		FavoriteSort: sc.FavoriteSort,
 	}, nil
 }
 

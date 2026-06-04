@@ -21,7 +21,13 @@ export const KEYBOARD_SHORTCUT_GROUPS: KeyboardShortcutGroup[] = [
     items: [
       { label: "Run query", keys: formatShortcut("Enter") },
       { label: "Save script", keys: formatShortcut("S") },
+      { label: "Rename active script", keys: formatShortcut("F2") },
       { label: "Edit script name & tags", keys: formatShortcut("S", { shift: true }) },
+      {
+        label: "Toggle favorite",
+        keys: formatShortcut("B", { shift: true }),
+        description: "Adds or removes the active script from Favorites",
+      },
       { label: "New script tab", keys: formatShortcut("N"), description: "Also ⌘T / Ctrl+T" },
       { label: "Close active tab", keys: formatShortcut("W") },
       { label: "Toggle SQL line comment", keys: formatShortcut("/"), description: "When the editor is focused" },

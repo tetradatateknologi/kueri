@@ -34,3 +34,10 @@ export function createScript(body: {
   });
 }
 
+export function setScriptFavorite(id: number, favorite: boolean) {
+  return apiFetch<Script>(`/api/v1/scripts/${id}/favorite`, {
+    method: "PATCH",
+    body: JSON.stringify({ favorite }),
+  });
+}
+

@@ -62,3 +62,19 @@ WHERE w.user_id = $1
   AND s.deleted_at IS NULL
   AND w.deleted_at IS NULL
 ORDER BY s.updated_at DESC;
+
+-- name: MaxFavoriteSortForUser :one
+SELECT COALESCE(MAX(favorite_sort), 0)::int AS max_sort
+FROM saved_scripts
+WHERE user_id = $1
+  AND is_favorite = TRUE
+  AND deleted_at IS NULL;
+
+-- name: SetScriptFavorite :one
+UPDATE saved_scripts
+SET is_favorite = $2,
+    favorite_sort = $3,
+    updated_at = NOW()
+WHERE id = $1
+  AND deleted_at IS NULL
+RETURNING *;

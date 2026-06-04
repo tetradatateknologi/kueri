@@ -12,6 +12,7 @@ func RegisterRoutes(g *echo.Group, pool *pgxpool.Pool) {
 	g.GET("/scripts", h.List)
 	g.GET("/scripts/:id", h.Get)
 	g.POST("/scripts", h.Create)
+	g.PATCH("/scripts/:id/favorite", h.SetFavorite)
 	g.PATCH("/scripts/:id", h.Update)
 	g.DELETE("/scripts/:id", h.Delete)
 }
