@@ -31,7 +31,7 @@ export function SettingsView() {
         </button>
       </header>
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex flex-1 min-h-0 min-w-0 w-full">
         <nav
           className="w-52 shrink-0 border-r border-border p-3 space-y-1 bg-surface-1/20"
           aria-label="Settings sections"
@@ -54,7 +54,7 @@ export function SettingsView() {
           ))}
         </nav>
 
-        <main className="flex-1 min-h-0 overflow-y-auto p-6 max-w-3xl">
+        <main className="flex-1 min-h-0 min-w-0 w-full overflow-y-auto p-6">
           {settingsSection === "guide" && (
             <div className="space-y-8">
               <div>
