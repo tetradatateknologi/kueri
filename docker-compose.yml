@@ -1,0 +1,40 @@
+networks:
+  kueri_internal:
+    driver: bridge
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: kueri
+      POSTGRES_PASSWORD: kueri_secret
+      POSTGRES_DB: kueri
+    ports:
+      - "${KUERI_DB_PORT:-5433}:5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U kueri -d kueri"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kueri_internal
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - kueri_internal
+
+volumes:
+  pg_data:
+  redis_data:
