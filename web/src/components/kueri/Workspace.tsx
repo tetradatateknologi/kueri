@@ -1,11 +1,12 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Play, X, Plus, Download, Save, Clock, Loader2 } from "lucide-react";
 
 import { ExportModal } from "@/components/kueri/ExportModal";
 import { JsonResultsView } from "@/components/kueri/JsonResultsView";
 import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
+import { EditorEmptyState } from "@/components/kueri/EditorEmptyState";
+import { EditorPane } from "@/components/kueri/EditorPane";
 import { ResultsGrid } from "@/components/kueri/ResultsGrid";
-import { SqlEditor } from "@/components/kueri/SqlEditor";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -76,8 +77,17 @@ export function Workspace() {
     .filter((s): s is NonNullable<typeof s> => s != null);
 
   const activeTitle = activeScript?.title ?? "untitled.sql";
+  const hasOpenTab = openScriptIds.length > 0;
+
+  useEffect(() => {
+    if (openScriptIds.length === 0) {
+      setLastResult(null);
+      setLastQueryError(null);
+    }
+  }, [openScriptIds.length, setLastQueryError, setLastResult]);
 
   const runQuery = useCallback(() => {
+    if (!hasOpenTab) return;
     const sql = draftSql.trim();
     if (!sql) {
       showValidationError("SQL is empty");
@@ -123,11 +133,13 @@ export function Workspace() {
     setLastQueryError,
     setLastResult,
     env,
+    hasOpenTab,
   ]);
 
   useWorkspaceHotkeys({ onRun: runQuery });
 
   const handleSave = async () => {
+    if (!hasOpenTab) return;
     if (activeScriptId == null) {
       saveScript({ title: activeTitle, sql: draftSql });
       showSaveScriptToast({ local: true });
@@ -259,7 +271,7 @@ export function Workspace() {
 
           <button
             type="button"
-            disabled={isSaving}
+            disabled={!hasOpenTab || isSaving}
             onClick={() => void handleSave()}
             className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors disabled:opacity-50"
           >
@@ -275,12 +287,14 @@ export function Workspace() {
           </button>
 
           <div className="ml-auto flex items-center gap-2">
-            <span className="text-[11px] text-muted-foreground font-mono">
-              {draftSql.split("\n").length} lines
-            </span>
+            {hasOpenTab && (
+              <span className="text-[11px] text-muted-foreground font-mono">
+                {draftSql.split("\n").length} lines
+              </span>
+            )}
             <button
               type="button"
-              disabled={executeMutation.isPending}
+              disabled={!hasOpenTab || executeMutation.isPending}
               onClick={runQuery}
               className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-electric text-primary-foreground text-xs font-semibold hover:brightness-110 transition-all glow-electric disabled:opacity-60"
             >
@@ -297,7 +311,11 @@ export function Workspace() {
 
         <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0" id="kueri-editor-results">
           <ResizablePanel defaultSize={50} minSize={20}>
-            <SqlEditor value={draftSql} onChange={setDraftSql} />
+            {hasOpenTab ? (
+              <EditorPane value={draftSql} onChange={setDraftSql} />
+            ) : (
+              <EditorEmptyState onCreateScript={() => void createNewScript()} />
+            )}
           </ResizablePanel>
           <ResizableHandle withHandle />
           <ResizablePanel defaultSize={50} minSize={20}>

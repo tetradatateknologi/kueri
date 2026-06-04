@@ -130,6 +130,9 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         if (activeScriptId === id) {
           setActiveScriptId(next[0] ?? null);
         }
+        if (next.length === 0) {
+          setDraftSql("");
+        }
         return next;
       });
     },

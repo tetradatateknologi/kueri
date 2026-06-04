@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { ArrowUpDown, Database } from "lucide-react";
 
+import { WorkspaceEmptyState } from "@/components/kueri/WorkspaceEmptyState";
 import { ResultsTableSkeleton } from "@/components/kueri/ResultsTableSkeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { cn } from "@/lib/utils";
@@ -56,11 +57,11 @@ export function ResultsGrid({ result, isLoading, error }: ResultsGridProps) {
 
   if (!result) {
     return (
-      <div className="h-full flex flex-col items-center justify-center gap-3 text-muted-foreground p-6">
-        <Database className="size-10 opacity-40" />
-        <p className="text-sm">Run a query to see results</p>
-        <p className="text-[11px] font-mono opacity-70">⌘↵ or click Run Query</p>
-      </div>
+      <WorkspaceEmptyState
+        icon={Database}
+        title="Run a query to see results"
+        hint="⌘↵ or click Run Query"
+      />
     );
   }
 
