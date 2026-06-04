@@ -3,10 +3,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import {
   ChevronRight,
   FileCode2,
+  Filter,
   FolderGit2,
   Plus,
   Search,
   Settings,
+  X,
 } from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/kueri/ConfirmDeleteDialog";
@@ -25,6 +27,7 @@ import {
   SidebarHeader,
   SidebarRail,
 } from "@/components/ui/sidebar";
+import { useAppUrl, useProjectWorkspaceId } from "@/context/app-url";
 import { useAppView } from "@/context/app-view";
 import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
@@ -108,6 +111,8 @@ export function Sidebar() {
   const [deleteTarget, setDeleteTarget] = useState<DeleteTarget | null>(null);
   const { selectConnection } = useSelectConnection();
   const { view, openWorkspace, openSettings } = useAppView();
+  const { setProjectFilter, renameProjectParam } = useAppUrl();
+  const projectWorkspaceId = useProjectWorkspaceId(workspaces);
 
   const handleMutationError = (err: unknown) => {
     const message =
@@ -120,6 +125,7 @@ export function Sidebar() {
       updateWorkspace(target.id, { name: target.name }),
     onSuccess: async (ws, variables) => {
       await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+      renameProjectParam(variables.name, ws.name);
       if (selectedConnection?.projectId === String(variables.id)) {
         setSelectedConnection({
           ...selectedConnection,
@@ -145,6 +151,9 @@ export function Sidebar() {
     onSuccess: async (_data, target) => {
       if (target.kind === "workspace") {
         await queryClient.invalidateQueries({ queryKey: ["workspaces"] });
+        if (projectWorkspaceId === target.id) {
+          setProjectFilter(null);
+        }
         if (selectedConnection?.projectId === String(target.id)) {
           setSelectedConnection(null);
         }
@@ -166,10 +175,20 @@ export function Sidebar() {
     onError: handleMutationError,
   });
 
+  const scopedWorkspaces = useMemo(() => {
+    if (projectWorkspaceId == null) return workspaces;
+    return workspaces.filter((w) => w.id === projectWorkspaceId);
+  }, [workspaces, projectWorkspaceId]);
+
+  const visibleFavorites = useMemo(() => {
+    if (projectWorkspaceId == null) return favoriteScripts;
+    return favoriteScripts.filter((s) => s.workspace_id === projectWorkspaceId);
+  }, [favoriteScripts, projectWorkspaceId]);
+
   const filteredWorkspaces = useMemo(() => {
     const q = search.trim().toLowerCase();
-    if (!q) return workspaces;
-    return workspaces
+    if (!q) return scopedWorkspaces;
+    return scopedWorkspaces
       .map((ws) => ({
         ...ws,
         connections: ws.connections.filter(
@@ -188,12 +207,12 @@ export function Sidebar() {
         );
         return ws.name.toLowerCase().includes(q) || ws.connections.length > 0 || hasMatchingScript;
       });
-  }, [workspaces, scripts, search]);
+  }, [scopedWorkspaces, scripts, search]);
 
   const scriptsByWorkspace = useMemo(() => {
     const q = search.trim().toLowerCase();
     const map = new Map<number, Script[]>();
-    for (const ws of workspaces) {
+    for (const ws of scopedWorkspaces) {
       map.set(ws.id, []);
     }
     for (const s of scripts) {
@@ -208,13 +227,16 @@ export function Sidebar() {
       }
     }
     return map;
-  }, [workspaces, scripts, search]);
+  }, [scopedWorkspaces, scripts, search]);
 
   useEffect(() => {
     if (!hasHydrated || isLoading || workspaces.length === 0) return;
     if (selectedConnection?.connectionId) return;
 
-    const ws = workspaces[0];
+    const ws =
+      (projectWorkspaceId != null
+        ? workspaces.find((w) => w.id === projectWorkspaceId)
+        : undefined) ?? workspaces[0];
     const conn = ws.connections[0];
     if (!conn) return;
 
@@ -226,7 +248,14 @@ export function Sidebar() {
       label: conn.name,
       host: conn.display_host,
     });
-  }, [hasHydrated, isLoading, workspaces, selectedConnection?.connectionId, selectConnection]);
+  }, [
+    hasHydrated,
+    isLoading,
+    workspaces,
+    projectWorkspaceId,
+    selectedConnection?.connectionId,
+    selectConnection,
+  ]);
 
   const pickConnection = (
     workspace: (typeof workspaces)[0],
@@ -269,7 +298,7 @@ export function Sidebar() {
           <KueriLogo size="sm" />
         </SidebarHeader>
 
-        <div className="px-3 pt-3 shrink-0">
+        <div className="px-3 pt-3 shrink-0 space-y-2">
           <div className="relative">
             <Search className="size-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <input
@@ -280,6 +309,36 @@ export function Sidebar() {
               className="w-full bg-surface-1 border border-border rounded-md text-xs pl-8 pr-2 py-2 outline-none focus:border-electric/60 focus:ring-1 focus:ring-electric/30 transition-colors"
             />
           </div>
+          <div className="flex items-center gap-1">
+            <Filter className="size-3 shrink-0 text-muted-foreground" aria-hidden />
+            <select
+              value={projectWorkspaceId ?? ""}
+              onChange={(e) => {
+                const id = e.target.value ? Number(e.target.value) : null;
+                const ws = id != null ? workspaces.find((w) => w.id === id) : null;
+                setProjectFilter(ws ?? null);
+              }}
+              className="flex-1 min-w-0 bg-surface-1 border border-border rounded-md text-xs px-2 py-1.5 outline-none focus:border-electric/60 focus:ring-1 focus:ring-electric/30 transition-colors"
+              aria-label="Filter by project"
+            >
+              <option value="">All projects</option>
+              {workspaces.map((ws) => (
+                <option key={ws.id} value={ws.id}>
+                  {ws.name}
+                </option>
+              ))}
+            </select>
+            {projectWorkspaceId != null && (
+              <button
+                type="button"
+                onClick={() => setProjectFilter(null)}
+                className="shrink-0 p-1.5 text-muted-foreground hover:text-foreground rounded-md hover:bg-surface-1 transition-colors"
+                aria-label="Clear project filter"
+              >
+                <X className="size-3.5" />
+              </button>
+            )}
+          </div>
         </div>
 
         <SidebarContent className="px-2 py-3 space-y-5">
@@ -288,8 +347,8 @@ export function Sidebar() {
           ) : (
             <>
               <FavoritesSection
-                favorites={favoriteScripts}
-                workspaces={workspaces}
+                favorites={visibleFavorites}
+                workspaces={scopedWorkspaces}
                 onOpenScript={openScript}
                 onToggleFavorite={toggleFavorite}
                 onEditScript={openEditScript}
@@ -316,7 +375,11 @@ export function Sidebar() {
                     <p className="px-2 text-xs text-muted-foreground">No workspaces found.</p>
                   )}
                   {filteredWorkspaces.map((ws) => {
-                    const open = openProjects[ws.id] ?? ws.id === workspaces[0]?.id;
+                    const open =
+                      openProjects[ws.id] ??
+                      (projectWorkspaceId != null
+                        ? ws.id === projectWorkspaceId
+                        : ws.id === scopedWorkspaces[0]?.id);
                     return (
                       <div key={ws.id}>
                         <div className="group flex items-center gap-0.5">

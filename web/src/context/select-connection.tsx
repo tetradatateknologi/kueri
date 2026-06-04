@@ -9,6 +9,7 @@ import {
 } from "react";
 
 import { ProductionEnvDialog } from "@/components/kueri/ProductionEnvDialog";
+import { useAppUrl } from "@/context/app-url";
 import { useWorkspaceStore, type SelectedConnection } from "@/stores/workspace-store";
 
 type SelectConnectionContextValue = {
@@ -19,8 +20,17 @@ const SelectConnectionContext = createContext<SelectConnectionContextValue | nul
 
 export function SelectConnectionProvider({ children }: { children: ReactNode }) {
   const setSelectedConnection = useWorkspaceStore((s) => s.setSelectedConnection);
+  const { setActiveConnectionId } = useAppUrl();
   const [prodDialogOpen, setProdDialogOpen] = useState(false);
   const pendingConnection = useRef<SelectedConnection | null>(null);
+
+  const applyConnection = useCallback(
+    (selected: SelectedConnection) => {
+      setSelectedConnection(selected);
+      setActiveConnectionId(selected.connectionId);
+    },
+    [setSelectedConnection, setActiveConnectionId],
+  );
 
   const selectConnection = useCallback(
     (selected: SelectedConnection) => {
@@ -29,9 +39,9 @@ export function SelectConnectionProvider({ children }: { children: ReactNode }) 
         setProdDialogOpen(true);
         return;
       }
-      setSelectedConnection(selected);
+      applyConnection(selected);
     },
-    [setSelectedConnection],
+    [applyConnection],
   );
 
   const value = useMemo(() => ({ selectConnection }), [selectConnection]);
@@ -44,7 +54,7 @@ export function SelectConnectionProvider({ children }: { children: ReactNode }) 
         onOpenChange={setProdDialogOpen}
         onConfirm={() => {
           if (pendingConnection.current) {
-            setSelectedConnection(pendingConnection.current);
+            applyConnection(pendingConnection.current);
             pendingConnection.current = null;
           }
           setProdDialogOpen(false);

@@ -7,6 +7,8 @@ import { Sidebar } from "@/components/kueri/Sidebar";
 import { Workspace } from "@/components/kueri/Workspace";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { Toaster } from "@/components/ui/sonner";
+import { AppUrlSync } from "@/components/kueri/AppUrlSync";
+import { AppUrlProvider } from "@/context/app-url";
 import { AppViewProvider, useAppView } from "@/context/app-view";
 import { KueriAppProvider } from "@/context/kueri-app";
 import { SelectConnectionProvider } from "@/context/select-connection";
@@ -26,8 +28,10 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <KueriAppProvider>
+        <AppUrlProvider>
         <AppViewProvider>
         <SelectConnectionProvider>
+          <AppUrlSync />
           <DesktopWelcomeGate>
           <SidebarProvider
             className="dark !min-h-0 h-screen w-screen overflow-hidden bg-background text-foreground"
@@ -43,6 +47,7 @@ export default function App() {
           </DesktopWelcomeGate>
         </SelectConnectionProvider>
         </AppViewProvider>
+        </AppUrlProvider>
       </KueriAppProvider>
     </QueryClientProvider>
   );

@@ -19,6 +19,26 @@ App: **http://localhost:5173**
 
 Dev server proxies `/api`, `/health`, `/ping`, and `/query` to the API.
 
+### Shareable URL state
+
+The app syncs key UI state to query parameters so you can bookmark or share links:
+
+| Parameter | Example | Effect |
+|-----------|---------|--------|
+| `project` | `?project=one.tetradata.id` | Sidebar filter: show only that workspace (name or numeric id) |
+| `script` | `?script=42` | Open script tab by id |
+| `connection` | `?connection=7` | Select database connection by id |
+| `view` | `?view=settings` | Open Settings instead of the editor |
+| `section` | `?section=shortcuts` | Settings section (with `view=settings`) |
+
+Examples:
+
+- `http://localhost:5173?project=pids.asdp.id`
+- `http://localhost:5173?project=one.tetradata.id&script=12&connection=3`
+- `http://localhost:5173?view=settings&section=backup`
+
+Changing the project filter, active script, connection, or settings navigation updates the URL automatically (browser back/forward is supported).
+
 ### Query execution
 
 - **Run Query** calls `POST /query` with `{ sql, env }` (stub; ~300–800ms delay, mock rows).

@@ -7,6 +7,9 @@ import {
   type ReactNode,
 } from "react";
 
+import { useAppUrl } from "@/context/app-url";
+import { readAppUrlFromLocation } from "@/lib/app-url";
+
 export type AppView = "workspace" | "settings";
 
 export type SettingsSection = "guide" | "shortcuts" | "backup" | "about" | "contribute";
@@ -21,17 +24,28 @@ type AppViewContextValue = {
 const AppViewContext = createContext<AppViewContextValue | null>(null);
 
 export function AppViewProvider({ children }: { children: ReactNode }) {
-  const [view, setView] = useState<AppView>("workspace");
-  const [settingsSection, setSettingsSection] = useState<SettingsSection>("guide");
+  const { syncAppView } = useAppUrl();
+  const initialUrl = useMemo(() => readAppUrlFromLocation(), []);
+  const [view, setView] = useState<AppView>(
+    initialUrl.view === "settings" ? "settings" : "workspace",
+  );
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>(
+    initialUrl.settingsSection ?? "guide",
+  );
 
   const openWorkspace = useCallback(() => {
     setView("workspace");
-  }, []);
+    syncAppView("workspace");
+  }, [syncAppView]);
 
-  const openSettings = useCallback((section: SettingsSection = "guide") => {
-    setSettingsSection(section);
-    setView("settings");
-  }, []);
+  const openSettings = useCallback(
+    (section: SettingsSection = "guide") => {
+      setSettingsSection(section);
+      setView("settings");
+      syncAppView("settings", section);
+    },
+    [syncAppView],
+  );
 
   const value = useMemo(
     () => ({ view, settingsSection, openWorkspace, openSettings }),
