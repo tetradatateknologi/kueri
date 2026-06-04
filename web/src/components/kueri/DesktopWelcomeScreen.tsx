@@ -63,12 +63,12 @@ export function DesktopWelcomeScreen({
         </div>
 
         <h1 id="desktop-welcome-title" className="sr-only">
-          Selamat datang di Kueri
+          Welcome to Kueri
         </h1>
 
         <p id="desktop-welcome-desc" className="text-sm leading-relaxed text-muted-foreground">
-          Workspace database modern untuk menulis SQL, mengelola koneksi, dan menyimpan skrip Anda —
-          sepenuhnya offline di perangkat ini.
+          A modern database workspace for writing SQL, managing connections, and saving your scripts
+          — fully offline on this device.
         </p>
 
         <p className="mt-3 font-mono text-[11px] text-muted-foreground/70">v{appVersion}</p>
@@ -77,7 +77,7 @@ export function DesktopWelcomeScreen({
           {!canContinue ? (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <Loader2 className="size-4 animate-spin text-electric" aria-hidden />
-              <span>{apiReady ? "Hampir siap…" : "Menyiapkan aplikasi…"}</span>
+              <span>{apiReady ? "Almost ready…" : "Starting up…"}</span>
             </div>
           ) : (
             <Button
@@ -86,7 +86,7 @@ export function DesktopWelcomeScreen({
               className="min-w-40 bg-electric text-background hover:bg-electric/90"
               onClick={onContinue}
             >
-              Mulai
+              Get started
             </Button>
           )}
         </div>

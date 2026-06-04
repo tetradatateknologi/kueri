@@ -69,25 +69,25 @@ export const USAGE_GUIDE_SECTIONS = [
     id: "workflow",
     title: "Workflow",
     body: [
-      "Pilih workspace dan koneksi database di sidebar kiri — lingkungan (dev / staging / prod) mengikuti koneksi yang dipilih.",
-      "Buka atau buat script SQL di tab editor. Jalankan query dengan Run Query atau ⌘↵.",
-      "Hasil tampil di panel bawah (tabel atau JSON). Gunakan Smart Export untuk mengekspor hasil.",
-      "Query history menyimpan 10 run terakhir di browser ini (lokal).",
+      "Select a workspace and database connection in the left sidebar — environment (dev / staging / prod) follows the selected connection.",
+      "Open or create SQL scripts in the editor tabs. Run queries with Run Query or ⌘↵.",
+      "Results appear in the bottom panel (table or JSON). Use Smart Export to export results.",
+      "Query history stores the last 10 runs in this browser (local only).",
     ],
   },
   {
     id: "safety",
     title: "Production",
     body: [
-      "Saat memilih koneksi production, konfirmasi dialog akan muncul sebelum query dijalankan.",
-      "Periksa SQL dengan teliti sebelum menjalankan perintah destruktif di lingkungan live.",
+      "When you select a production connection, a confirmation dialog appears before the query runs.",
+      "Review SQL carefully before running destructive statements in a live environment.",
     ],
   },
   {
     id: "shortcuts",
-    title: "Pintasan",
+    title: "Shortcuts",
     body: [
-      "Semua pintasan tersedia di menu Settings di sidebar, pada bagian Panduan & pintasan.",
+      "All shortcuts are listed under Settings in the sidebar, in Guide and Keyboard shortcuts.",
     ],
   },
 ] as const;

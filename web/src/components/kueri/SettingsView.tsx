@@ -10,11 +10,11 @@ import { USAGE_GUIDE_SECTIONS } from "@/lib/keyboard-shortcuts";
 import { cn } from "@/lib/utils";
 
 const NAV: { id: SettingsSection; label: string; icon: typeof BookOpen }[] = [
-  { id: "guide", label: "Panduan", icon: BookOpen },
-  { id: "shortcuts", label: "Pintasan keyboard", icon: Keyboard },
-  { id: "backup", label: "Cadangan data", icon: DatabaseBackup },
-  { id: "about", label: "Tentang & pembaruan", icon: Info },
-  { id: "contribute", label: "Dukungan & kontribusi", icon: Heart },
+  { id: "guide", label: "Guide", icon: BookOpen },
+  { id: "shortcuts", label: "Keyboard shortcuts", icon: Keyboard },
+  { id: "backup", label: "Data backup", icon: DatabaseBackup },
+  { id: "about", label: "About & updates", icon: Info },
+  { id: "contribute", label: "Support & contribute", icon: Heart },
 ];
 
 export function SettingsView() {
@@ -31,7 +31,7 @@ export function SettingsView() {
           className="ml-auto flex items-center gap-1.5 h-8 px-3 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors"
         >
           <ArrowLeft className="size-3.5" />
-          Kembali ke editor
+          Back to editor
         </button>
       </header>
 
@@ -62,9 +62,9 @@ export function SettingsView() {
           {settingsSection === "guide" && (
             <div className="space-y-8">
               <div>
-                <h2 className="text-lg font-semibold">Panduan Kueri</h2>
+                <h2 className="text-lg font-semibold">Kueri guide</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Ringkasan cara menggunakan editor SQL dan fitur utama aplikasi.
+                  Overview of the SQL editor and main application features.
                 </p>
               </div>
               {USAGE_GUIDE_SECTIONS.map((section) => (
@@ -83,9 +83,9 @@ export function SettingsView() {
           {settingsSection === "shortcuts" && (
             <div className="space-y-4" id="settings-shortcuts">
               <div>
-                <h2 className="text-lg font-semibold">Pintasan keyboard</h2>
+                <h2 className="text-lg font-semibold">Keyboard shortcuts</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Daftar lengkap shortcut di workspace. Di Mac gunakan ⌘; di Windows/Linux gunakan Ctrl.
+                  Full shortcut list for the workspace. On Mac use ⌘; on Windows/Linux use Ctrl.
                 </p>
               </div>
               <KeyboardShortcutsGuide />

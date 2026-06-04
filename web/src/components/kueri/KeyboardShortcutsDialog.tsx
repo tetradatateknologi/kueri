@@ -20,7 +20,7 @@ export function KeyboardShortcutsDialog({ open, onOpenChange }: KeyboardShortcut
         <DialogHeader>
           <DialogTitle>Keyboard shortcuts</DialogTitle>
           <DialogDescription>
-            Ringkasan cepat. Buka Settings → Pintasan keyboard untuk panduan lengkap.
+            Quick reference. Open Settings → Keyboard shortcuts for the full list.
           </DialogDescription>
         </DialogHeader>
         <KeyboardShortcutsGuide className="mt-2" />

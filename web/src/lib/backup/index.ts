@@ -41,17 +41,17 @@ export function buildBackupFile(
 
 export function parseBackupFile(raw: unknown): KueriBackupFile {
   if (!raw || typeof raw !== "object") {
-    throw new Error("File cadangan tidak valid.");
+    throw new Error("Invalid backup file.");
   }
   const data = raw as Partial<KueriBackupFile>;
   if (data.format !== BACKUP_FORMAT) {
-    throw new Error("Format cadangan tidak dikenali. Gunakan file ekspor Kueri (.json).");
+    throw new Error("Unrecognized backup format. Use a Kueri export file (.json).");
   }
   if (data.format_version !== BACKUP_FORMAT_VERSION) {
-    throw new Error(`Versi cadangan v${data.format_version} belum didukung.`);
+    throw new Error(`Backup version v${data.format_version} is not supported yet.`);
   }
   if (!Array.isArray(data.workspaces)) {
-    throw new Error("Struktur workspace pada cadangan tidak valid.");
+    throw new Error("Invalid workspace structure in backup file.");
   }
   return data as KueriBackupFile;
 }

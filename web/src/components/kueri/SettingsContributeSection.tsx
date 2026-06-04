@@ -12,10 +12,10 @@ export function SettingsContributeSection() {
   return (
     <div className="space-y-8" id="settings-contribute">
       <div>
-        <h2 className="text-lg font-semibold">Dukungan & kontribusi</h2>
+        <h2 className="text-lg font-semibold">Support & contribute</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Kueri adalah proyek open source yang dikembangkan secara terbuka. Laporkan bug, usulkan
-          fitur, atau berkontribusi langsung di GitHub.
+          Kueri is an open-source project developed in the open. Report bugs, suggest features, or
+          contribute directly on GitHub.
         </p>
       </div>
 
@@ -25,10 +25,9 @@ export function SettingsContributeSection() {
             <Github className="size-5 text-electric" />
           </div>
           <div className="min-w-0 space-y-1">
-            <h3 className="text-sm font-semibold">Repositori GitHub</h3>
+            <h3 className="text-sm font-semibold">GitHub repository</h3>
             <p className="text-sm text-muted-foreground">
-              Kode sumber, dokumentasi, dan riwayat perubahan tersedia di organisasi Tetradata
-              Teknologi.
+              Source code, documentation, and change history are available from Tetradata Teknologi.
             </p>
             <a
               href={KUERI_GITHUB_REPO_URL}
@@ -46,19 +45,17 @@ export function SettingsContributeSection() {
       <section className="space-y-3">
         <h3 className="text-sm font-semibold flex items-center gap-2">
           <Heart className="size-4 text-neon" />
-          Cara membantu
+          How to help
         </h3>
         <ul className="space-y-3 text-sm text-muted-foreground">
           <li className="flex gap-2">
             <span className="text-foreground font-mono text-xs shrink-0 mt-0.5">★</span>
-            <span>
-              Beri bintang pada repositori agar proyek lebih mudah ditemukan oleh developer lain.
-            </span>
+            <span>Star the repository so more developers can discover the project.</span>
           </li>
           <li className="flex gap-2">
             <MessageCircle className="size-3.5 shrink-0 mt-0.5 text-muted-foreground" />
             <span>
-              Laporkan bug atau minta fitur lewat{" "}
+              Report bugs or request features via{" "}
               <a
                 href={KUERI_GITHUB_ISSUES_URL}
                 target="_blank"
@@ -74,16 +71,16 @@ export function SettingsContributeSection() {
           <li className="flex gap-2">
             <Github className="size-3.5 shrink-0 mt-0.5 text-muted-foreground" />
             <span>
-              Kirim pull request untuk perbaikan atau fitur baru — ikuti panduan di README
-              repositori.
+              Send pull requests for fixes or new features — follow the guidelines in the repository
+              README.
             </span>
           </li>
         </ul>
       </section>
 
       <p className="text-xs text-muted-foreground border-t border-border pt-4">
-        Terima kasih telah menggunakan Kueri. Masukan Anda membantu menjadikan workspace database ini
-        lebih baik untuk semua orang.
+        Thank you for using Kueri. Your feedback helps make this database workspace better for
+        everyone.
       </p>
     </div>
   );

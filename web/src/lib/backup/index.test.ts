@@ -22,6 +22,6 @@ describe("parseBackupFile", () => {
         format_version: 1,
         workspaces: [],
       }),
-    ).toThrow(/tidak dikenali/i);
+    ).toThrow(/unrecognized backup format/i);
   });
 });
