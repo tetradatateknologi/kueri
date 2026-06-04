@@ -35,7 +35,7 @@ import {
   showValidationError,
 } from "@/lib/toasts";
 import { cn } from "@/lib/utils";
-import { useWorkspaceStore, type WorkspaceEnv } from "@/stores/workspace-store";
+import { useWorkspaceStore } from "@/stores/workspace-store";
 
 export function Workspace() {
   const {

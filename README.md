@@ -16,6 +16,8 @@ Monorepo for **kueri**, a modern database workspace: a **Go (Echo) REST API** (`
 
 Per-package quick starts: [api/README.md](api/README.md), [web/README.md](web/README.md).
 
+**Desktop / offline mode:** [docs/desktop.md](docs/desktop.md)
+
 ---
 
 ## Tech stack

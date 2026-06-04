@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { ReactElement } from "react";
 import { toast } from "sonner";
 
 import { ExportToast } from "@/components/kueri/toasts/ExportToast";
@@ -12,7 +12,7 @@ const customToastOptions = {
   className: "!bg-transparent !border-0 !shadow-none !p-0 !gap-0",
 } as const;
 
-function showCustomToast(render: (onDismiss: () => void) => ReactNode) {
+function showCustomToast(render: (onDismiss: () => void) => ReactElement) {
   toast.custom((id) => render(() => toast.dismiss(id)), customToastOptions);
 }
 

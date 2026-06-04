@@ -46,6 +46,12 @@ func NotFound(c echo.Context, message string) error {
 	})
 }
 
+func Error(c echo.Context, status int, code, message string) error {
+	return c.JSON(status, ErrorResponse{
+		Error: ErrorBody{Code: code, Message: message},
+	})
+}
+
 func InternalError(c echo.Context, message string, err error) error {
 	if err != nil {
 		slog.Error(message, "error", err)

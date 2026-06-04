@@ -28,8 +28,9 @@ jobs:
       - name: Test and build
         working-directory: api
         run: |
+          VERSION="$(tr -d '[:space:]' < ../VERSION)"
           go test ./...
-          go build -o /tmp/kueri-api ./cmd/api
+          go build -ldflags="-X github.com/tetradatateknologi/kueri/api/internal/version.Version=${VERSION}" -o /tmp/kueri-api ./cmd/api
 
   kueri-web:
     runs-on: ubuntu-latest
@@ -56,3 +57,35 @@ jobs:
       - name: Build
         working-directory: web
         run: npm run build
+
+  kueri-desktop:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+          cache-dependency-path: api/go.sum
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - name: Build desktop bundle
+        run: |
+          VERSION="$(tr -d '[:space:]' < VERSION)"
+          cd web && npm ci && VITE_DESKTOP_BUILD=1 npm run build
+          rm -rf api/internal/desktop/webdist
+          mkdir -p api/internal/desktop/webdist
+          cp -R web/dist/. api/internal/desktop/webdist/
+          cd api
+          CGO_ENABLED=0 go build -tags desktop \
+            -ldflags="-X github.com/tetradatateknologi/kueri/api/internal/version.Version=${VERSION} -X github.com/tetradatateknologi/kueri/api/internal/version.Mode=desktop" \
+            -o /tmp/kueri-desktop ./cmd/desktop

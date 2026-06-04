@@ -10,19 +10,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/labstack/echo/v4"
-	echomw "github.com/labstack/echo/v4/middleware"
-
 	"github.com/tetradatateknologi/kueri/api/internal/config"
-	"github.com/tetradatateknologi/kueri/api/internal/http/middleware"
 	"github.com/tetradatateknologi/kueri/api/internal/logger"
-	"github.com/tetradatateknologi/kueri/api/internal/modules/health"
-	"github.com/tetradatateknologi/kueri/api/internal/modules/query"
-	"github.com/tetradatateknologi/kueri/api/internal/modules/me"
-	"github.com/tetradatateknologi/kueri/api/internal/modules/script"
-	"github.com/tetradatateknologi/kueri/api/internal/modules/workspace"
+	"github.com/tetradatateknologi/kueri/api/internal/modules/update"
 	"github.com/tetradatateknologi/kueri/api/internal/persistence"
+	"github.com/tetradatateknologi/kueri/api/internal/server"
+	"github.com/tetradatateknologi/kueri/api/internal/version"
 )
 
 func main() {
@@ -44,7 +37,9 @@ func main() {
 	}
 	defer pool.Close()
 
-	e := newRouter(cfg, pool)
+	e := server.NewRouter(cfg, pool, server.Options{
+		UpdateOpts: &update.Options{CurrentVersion: version.Version},
+	})
 
 	go func() {
 		addr := fmt.Sprintf(":%d", cfg.App.Port)
@@ -67,23 +62,4 @@ func main() {
 		slog.Error("server forced to shutdown", "error", err)
 	}
 	slog.Info("server stopped")
-}
-
-func newRouter(cfg *config.Config, pool *pgxpool.Pool) *echo.Echo {
-	e := echo.New()
-	e.HideBanner = true
-
-	e.Use(echomw.Recover())
-	e.Use(middleware.CORS(cfg.CORS.AllowedOrigins))
-
-	health.RegisterRoutes(e)
-	query.RegisterRoutes(e, pool, cfg)
-
-	api := e.Group("/api/v1")
-	api.Use(middleware.DevUser(pool, cfg.Dev.UserEmail))
-	me.RegisterRoutes(api)
-	workspace.RegisterRoutes(api, pool, cfg)
-	script.RegisterRoutes(api, pool)
-
-	return e
 }

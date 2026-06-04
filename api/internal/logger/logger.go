@@ -7,7 +7,7 @@ import (
 
 func Setup(env string) {
 	var handler slog.Handler
-	if env == "production" || env == "prod" {
+	if env == "production" || env == "prod" || env == "desktop" {
 		handler = slog.NewJSONHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelInfo})
 	} else {
 		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})

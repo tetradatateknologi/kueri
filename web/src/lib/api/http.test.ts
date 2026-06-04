@@ -33,7 +33,7 @@ describe("apiFetch", () => {
       }),
     );
 
-    await expect(executeQuery({ sql: "invalid", env: "development" })).rejects.toBeInstanceOf(
+    await expect(executeQuery({ sql: "invalid", connection_id: 1 })).rejects.toBeInstanceOf(
       ApiError,
     );
   });

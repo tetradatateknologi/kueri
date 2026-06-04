@@ -1,6 +1,7 @@
-import { ArrowLeft, BookOpen, Heart, Keyboard } from "lucide-react";
+import { ArrowLeft, BookOpen, Heart, Info, Keyboard } from "lucide-react";
 
 import { KeyboardShortcutsGuide } from "@/components/kueri/KeyboardShortcutsGuide";
+import { SettingsAboutSection } from "@/components/kueri/SettingsAboutSection";
 import { SettingsContributeSection } from "@/components/kueri/SettingsContributeSection";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useAppView, type SettingsSection } from "@/context/app-view";
@@ -10,6 +11,7 @@ import { cn } from "@/lib/utils";
 const NAV: { id: SettingsSection; label: string; icon: typeof BookOpen }[] = [
   { id: "guide", label: "Panduan", icon: BookOpen },
   { id: "shortcuts", label: "Pintasan keyboard", icon: Keyboard },
+  { id: "about", label: "Tentang & pembaruan", icon: Info },
   { id: "contribute", label: "Dukungan & kontribusi", icon: Heart },
 ];
 
@@ -89,6 +91,8 @@ export function SettingsView() {
           )}
 
           {settingsSection === "contribute" && <SettingsContributeSection />}
+
+          {settingsSection === "about" && <SettingsAboutSection />}
         </main>
       </div>
     </div>
