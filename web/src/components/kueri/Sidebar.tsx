@@ -477,13 +477,22 @@ export function Sidebar() {
             <span className="text-[10px] font-mono opacity-60">?</span>
           </button>
           {view === "settings" && (
-            <button
-              type="button"
-              onClick={() => openSettings("shortcuts")}
-              className="w-full flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface-1/60 transition-colors"
-            >
-              Pintasan keyboard
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => openSettings("shortcuts")}
+                className="w-full flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface-1/60 transition-colors"
+              >
+                Pintasan keyboard
+              </button>
+              <button
+                type="button"
+                onClick={() => openSettings("contribute")}
+                className="w-full flex items-center gap-2 pl-8 pr-3 py-1.5 rounded-md text-[11px] text-muted-foreground hover:text-foreground hover:bg-surface-1/60 transition-colors"
+              >
+                Dukungan & kontribusi
+              </button>
+            </>
           )}
         </SidebarFooter>
       </UiSidebar>
