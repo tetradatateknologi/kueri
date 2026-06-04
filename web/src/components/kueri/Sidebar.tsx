@@ -289,6 +289,7 @@ export function Sidebar() {
             <>
               <FavoritesSection
                 favorites={favoriteScripts}
+                workspaces={workspaces}
                 onOpenScript={openScript}
                 onToggleFavorite={toggleFavorite}
                 onEditScript={openEditScript}
