@@ -340,49 +340,62 @@ export function Workspace() {
           </div>
         </div>
 
-        <div className="h-12 px-3 flex items-center gap-2 border-b border-border bg-background">
-          <div
-            className={cn(
-              "flex items-center gap-2 px-3 h-8 rounded-md bg-surface-1 border border-border text-xs ring-1 ring-transparent",
-              envMeta[env].ring,
+        <div className="h-12 px-2 sm:px-3 flex items-center gap-1.5 sm:gap-2 border-b border-border bg-background min-w-0">
+          <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 overflow-hidden">
+            <div
+              className={cn(
+                "flex items-center gap-1.5 sm:gap-2 px-2 sm:px-3 h-8 rounded-md bg-surface-1 border border-border text-xs ring-1 ring-transparent shrink-0",
+                envMeta[env].ring,
+              )}
+              title="Environment follows the selected sidebar connection"
+            >
+              <span className={cn("size-2 rounded-full shrink-0", envMeta[env].dot)} />
+              <span className="text-muted-foreground hidden sm:inline">env:</span>
+              <span className="font-mono truncate">{env}</span>
+            </div>
+
+            {selectedConnection && (
+              <span className="hidden lg:inline text-[11px] text-muted-foreground font-mono truncate min-w-0">
+                {selectedConnection.label} · {selectedConnection.host}
+              </span>
             )}
-            title="Environment follows the selected sidebar connection"
-          >
-            <span className={cn("size-2 rounded-full", envMeta[env].dot)} />
-            <span className="text-muted-foreground">env:</span>
-            <span className="font-mono">{env}</span>
           </div>
 
-          {selectedConnection && (
-            <span className="text-[11px] text-muted-foreground font-mono truncate max-w-[200px]">
-              {selectedConnection.label} · {selectedConnection.host}
-            </span>
-          )}
+          <div className="flex items-center gap-0.5 sm:gap-1 shrink-0">
+            <div className="h-5 w-px bg-border mx-0.5 hidden sm:block" aria-hidden />
 
-          <div className="h-5 w-px bg-border mx-1" />
+            <button
+              type="button"
+              disabled={!hasOpenTab || isSaving}
+              onClick={() => void handleSave()}
+              aria-label="Save script"
+              title={`Save (${formatShortcut("S")})`}
+              className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap"
+            >
+              {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5 shrink-0" />}
+              <span className="hidden md:inline">Save</span>
+              <span className="hidden xl:inline text-[10px] opacity-60 font-mono">
+                {formatShortcut("S")}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setHistoryOpen(true)}
+              aria-label="Query history"
+              title={`History (${formatShortcut("H")})`}
+              className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors shrink-0 whitespace-nowrap"
+            >
+              <Clock className="size-3.5 shrink-0" />
+              <span className="hidden md:inline">History</span>
+              <span className="hidden xl:inline text-[10px] opacity-60 font-mono">
+                {formatShortcut("H")}
+              </span>
+            </button>
+          </div>
 
-          <button
-            type="button"
-            disabled={!hasOpenTab || isSaving}
-            onClick={() => void handleSave()}
-            className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors disabled:opacity-50"
-          >
-            {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
-            Save
-            <span className="text-[10px] opacity-60 font-mono">{formatShortcut("S")}</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => setHistoryOpen(true)}
-            className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors"
-          >
-            <Clock className="size-3.5" /> History
-            <span className="text-[10px] opacity-60 font-mono">{formatShortcut("H")}</span>
-          </button>
-
-          <div className="ml-auto flex items-center gap-2">
+          <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
             {hasOpenTab && (
-              <span className="text-[11px] text-muted-foreground font-mono">
+              <span className="hidden md:inline text-[11px] text-muted-foreground font-mono whitespace-nowrap tabular-nums">
                 {draftSql.split("\n").length} lines
               </span>
             )}
@@ -390,20 +403,24 @@ export function Workspace() {
               type="button"
               disabled={!hasOpenTab || executeMutation.isPending}
               onClick={runQuery}
-              className="flex items-center gap-1.5 h-8 px-3 rounded-md bg-electric text-primary-foreground text-xs font-semibold hover:brightness-110 transition-all glow-electric disabled:opacity-60"
+              aria-label="Run query"
+              title={`Run query (${formatShortcut("Enter")})`}
+              className="flex items-center gap-1.5 h-8 px-2 sm:px-3 rounded-md bg-electric text-primary-foreground text-xs font-semibold hover:brightness-110 transition-all glow-electric disabled:opacity-60 shrink-0 whitespace-nowrap"
             >
               {executeMutation.isPending ? (
-                <Loader2 className="size-3.5 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin shrink-0" />
               ) : (
-                <Play className="size-3.5 fill-current" />
+                <Play className="size-3.5 fill-current shrink-0" />
               )}
-              Run Query
-              <span className="text-[10px] opacity-70 font-mono pl-1">{formatShortcut("Enter")}</span>
+              <span className="hidden sm:inline">Run Query</span>
+              <span className="hidden lg:inline text-[10px] opacity-70 font-mono">
+                {formatShortcut("Enter")}
+              </span>
             </button>
             <button
               type="button"
               onClick={() => openSettings("shortcuts")}
-              className="size-8 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-1 text-xs font-mono"
+              className="size-8 shrink-0 rounded-md text-muted-foreground hover:text-foreground hover:bg-surface-1 text-xs font-mono"
               aria-label="Settings and keyboard shortcuts"
               title="Settings (?) — panduan & pintasan"
             >
