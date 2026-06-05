@@ -25,7 +25,6 @@ import {
   SidebarContent,
   SidebarFooter,
   SidebarHeader,
-  SidebarRail,
 } from "@/components/ui/sidebar";
 import { useAppUrl, useProjectWorkspaceId } from "@/context/app-url";
 import { useAppView } from "@/context/app-view";
@@ -293,7 +292,6 @@ export function Sidebar() {
   return (
     <>
       <UiSidebar collapsible="offcanvas" className="border-sidebar-border">
-        <SidebarRail />
         <SidebarHeader className="h-12 flex-row items-center gap-2 border-b border-sidebar-border px-3 py-0">
           <KueriLogo size="sm" />
         </SidebarHeader>

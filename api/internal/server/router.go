@@ -17,6 +17,7 @@ import (
 	"github.com/tetradatateknologi/kueri/api/internal/modules/health"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/me"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/query"
+	"github.com/tetradatateknologi/kueri/api/internal/modules/schema"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/script"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/update"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/workspace"
@@ -42,6 +43,7 @@ func NewRouter(cfg *config.Config, pool *pgxpool.Pool, opts Options) *echo.Echo 
 	me.RegisterRoutes(api)
 	workspace.RegisterRoutes(api, pool, cfg)
 	script.RegisterRoutes(api, pool)
+	schema.RegisterRoutes(api, pool, cfg)
 	backup.RegisterRoutes(api, pool, cfg)
 
 	if opts.UpdateOpts != nil {

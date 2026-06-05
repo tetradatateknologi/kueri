@@ -1,13 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Play, X, Plus, Download, Save, Clock, Loader2 } from "lucide-react";
+import { Play, X, Plus, Save, Clock, Loader2, Table2 } from "lucide-react";
 
 import { EnvironmentBadge } from "@/components/kueri/EnvironmentBadge";
+import { EditorResultsStack } from "@/components/kueri/EditorResultsStack";
 import { ExportModal } from "@/components/kueri/ExportModal";
-import { JsonResultsView } from "@/components/kueri/JsonResultsView";
 import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
-import { EditorEmptyState } from "@/components/kueri/EditorEmptyState";
-import { EditorPane } from "@/components/kueri/EditorPane";
-import { ResultsGrid } from "@/components/kueri/ResultsGrid";
+import { SchemaExplorerPanel } from "@/components/kueri/SchemaExplorerPanel";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -75,6 +73,7 @@ export function Workspace() {
 
   const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [schemaOpen, setSchemaOpen] = useState(true);
 
   const openTabs = openScriptIds
     .map((id) => scripts.find((s) => s.id === id))
@@ -372,6 +371,22 @@ export function Workspace() {
                 {formatShortcut("H")}
               </span>
             </button>
+            <button
+              type="button"
+              onClick={() => setSchemaOpen((open) => !open)}
+              aria-label={schemaOpen ? "Hide schema panel" : "Show schema panel"}
+              aria-pressed={schemaOpen}
+              title={schemaOpen ? "Hide schema" : "Show schema"}
+              className={cn(
+                "flex items-center gap-1.5 px-2 h-8 rounded-md text-xs transition-colors shrink-0 whitespace-nowrap",
+                schemaOpen
+                  ? "bg-surface-1 text-electric ring-1 ring-electric/30"
+                  : "text-muted-foreground hover:text-foreground hover:bg-surface-1",
+              )}
+            >
+              <Table2 className="size-3.5 shrink-0" />
+              <span className="hidden md:inline">Schema</span>
+            </button>
           </div>
 
           <div className="ml-auto flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -401,103 +416,79 @@ export function Workspace() {
           </div>
         </div>
 
-        <ResizablePanelGroup orientation="vertical" className="flex-1 min-h-0" id="kueri-editor-results">
-          <ResizablePanel defaultSize={50} minSize={20}>
-            {hasOpenTab ? (
-              <EditorPane
-                value={draftSql}
-                onChange={setDraftSql}
-                onRun={runQuery}
-                onEditScript={() => {
-                  if (activeScriptId != null) openEditScript(activeScriptId);
-                }}
-              />
-            ) : (
-              <EditorEmptyState
-                favorites={favoriteScripts}
-                onCreateScript={() => void createNewScript()}
-                onOpenScript={openScript}
-              />
-            )}
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={50} minSize={20}>
-            <div className="h-full min-h-0 flex flex-col bg-background">
-              <div className="h-10 px-3 border-b border-border flex items-center gap-2 bg-surface-1/40">
-                <div className="flex items-center gap-1" role="tablist" aria-label="Result view">
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={resultsView === "results"}
-                    onClick={() => setResultsView("results")}
-                    className={cn(
-                      "px-2.5 h-7 text-xs rounded-md transition-colors",
-                      resultsView === "results"
-                        ? "bg-surface-1 border border-electric/40 text-electric font-medium"
-                        : "text-muted-foreground hover:bg-surface-1",
-                    )}
-                  >
-                    Results
-                  </button>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <span>
-                        <button
-                          type="button"
-                          disabled
-                          className="px-2.5 h-7 text-xs rounded-md text-muted-foreground/50 cursor-not-allowed"
-                        >
-                          Chart
-                        </button>
-                      </span>
-                    </TooltipTrigger>
-                    <TooltipContent>Coming soon</TooltipContent>
-                  </Tooltip>
-                  <button
-                    type="button"
-                    role="tab"
-                    aria-selected={resultsView === "json"}
-                    onClick={() => setResultsView("json")}
-                    className={cn(
-                      "px-2.5 h-7 text-xs rounded-md transition-colors",
-                      resultsView === "json"
-                        ? "bg-surface-1 border border-electric/40 text-electric font-medium"
-                        : "text-muted-foreground hover:bg-surface-1",
-                    )}
-                  >
-                    JSON
-                  </button>
-                </div>
-
-                <div className="ml-auto flex items-center gap-2">
-                  {metaLabel && (
-                    <span className="text-[11px] text-muted-foreground font-mono">{metaLabel}</span>
-                  )}
-                  <button
-                    type="button"
-                    disabled={!lastResult}
-                    onClick={() => setExportOpen(true)}
-                    className="flex items-center gap-1.5 h-7 px-3 rounded-md bg-neon/10 border border-neon/40 text-neon text-xs font-medium hover:bg-neon/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
-                  >
-                    <Download className="size-3.5" /> Smart Export
-                  </button>
-                </div>
+        {schemaOpen ? (
+          <ResizablePanelGroup
+            orientation="horizontal"
+            className="flex-1 min-h-0 min-w-0"
+            id="kueri-schema-editor-v2"
+            defaultLayout={{ "kueri-schema": 26, "kueri-editor-stack": 74 }}
+          >
+            <ResizablePanel
+              id="kueri-schema"
+              defaultSize="26%"
+              minSize="220px"
+              maxSize="42%"
+              className="min-w-0"
+            >
+              <div className="h-full min-h-0 min-w-0 overflow-hidden">
+                <SchemaExplorerPanel
+                  connectionId={selectedConnection?.connectionId ?? null}
+                  connectionLabel={
+                    selectedConnection
+                      ? `${selectedConnection.label} · ${selectedConnection.host}`
+                      : undefined
+                  }
+                />
               </div>
-
-              <div className="flex-1 min-h-0">
-                {resultsView === "results" ? (
-                  <ResultsGrid
-                    result={lastResult}
-                    isLoading={executeMutation.isPending}
-                    error={lastQueryError}
-                  />
-                ) : (
-                  <JsonResultsView result={lastResult} />
-                )}
-              </div>
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel
+              id="kueri-editor-stack"
+              defaultSize="74%"
+              minSize="45%"
+              className="min-w-0"
+            >
+              <EditorResultsStack
+                hasOpenTab={hasOpenTab}
+                draftSql={draftSql}
+                setDraftSql={setDraftSql}
+                runQuery={runQuery}
+                activeScriptId={activeScriptId}
+                openEditScript={openEditScript}
+                favoriteScripts={favoriteScripts}
+                createNewScript={createNewScript}
+                openScript={openScript}
+                resultsView={resultsView}
+                setResultsView={setResultsView}
+                metaLabel={metaLabel}
+                lastResult={lastResult}
+                executeMutationIsPending={executeMutation.isPending}
+                lastQueryError={lastQueryError}
+                setExportOpen={setExportOpen}
+              />
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : (
+          <EditorResultsStack
+            className="flex-1 min-h-0 min-w-0"
+            hasOpenTab={hasOpenTab}
+            draftSql={draftSql}
+            setDraftSql={setDraftSql}
+            runQuery={runQuery}
+            activeScriptId={activeScriptId}
+            openEditScript={openEditScript}
+            favoriteScripts={favoriteScripts}
+            createNewScript={createNewScript}
+            openScript={openScript}
+            resultsView={resultsView}
+            setResultsView={setResultsView}
+            metaLabel={metaLabel}
+            lastResult={lastResult}
+            executeMutationIsPending={executeMutation.isPending}
+            lastQueryError={lastQueryError}
+            setExportOpen={setExportOpen}
+          />
+        )}
 
         <ExportModal
           open={exportOpen}

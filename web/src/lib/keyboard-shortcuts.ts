@@ -70,6 +70,7 @@ export const USAGE_GUIDE_SECTIONS = [
     title: "Workflow",
     body: [
       "Select a workspace and database connection in the left sidebar — environment (dev / staging / prod) follows the selected connection.",
+      "Use the Schema panel (left of the editor) to browse tables and columns read-only — expand a table to see column types and primary keys.",
       "Open or create SQL scripts in the editor tabs. Run queries with Run Query or ⌘↵.",
       "Results appear in the bottom panel (table or JSON). Use Smart Export to export results.",
       "Query history stores the last 10 runs in this browser (local only).",
