@@ -1,4 +1,4 @@
-import { ExternalLink, Github, Heart, MessageCircle } from "lucide-react";
+import { ExternalLink, Github, Heart, MessageCircle, Star } from "lucide-react";
 
 import {
   KUERI_GITHUB_ISSUES_URL,
@@ -49,7 +49,7 @@ export function SettingsContributeSection() {
         </h3>
         <ul className="space-y-3 text-sm text-muted-foreground">
           <li className="flex gap-2">
-            <span className="text-foreground font-mono text-xs shrink-0 mt-0.5">★</span>
+            <Star className="size-3.5 shrink-0 mt-0.5 text-muted-foreground" />
             <span>Star the repository so more developers can discover the project.</span>
           </li>
           <li className="flex gap-2">
