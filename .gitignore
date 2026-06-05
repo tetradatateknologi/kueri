@@ -19,6 +19,7 @@ dist-ssr
 
 # Go
 api/bin/
+api/desktop
 api/.env
 
 # Frontend env
