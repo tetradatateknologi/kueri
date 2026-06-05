@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"runtime"
 	"testing"
 )
 
@@ -50,7 +51,15 @@ func TestChecker_Check(t *testing.T) {
 
 func TestRuntimePlatform(t *testing.T) {
 	t.Parallel()
-	if RuntimePlatform() == "" {
+	platform := RuntimePlatform()
+	if platform == "" {
 		t.Fatal("expected non-empty platform")
+	}
+	switch runtime.GOOS {
+	case "darwin":
+		want := "darwin-" + runtime.GOARCH
+		if platform != want {
+			t.Fatalf("RuntimePlatform() = %q, want %q", platform, want)
+		}
 	}
 }

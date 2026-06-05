@@ -24,7 +24,11 @@ jobs:
           - os: macos-latest
             goos: darwin
             goarch: arm64
-            artifact: kueri-desktop-darwin-universal
+            artifact: kueri-desktop-darwin-arm64
+          - os: macos-latest
+            goos: darwin
+            goarch: amd64
+            artifact: kueri-desktop-darwin-amd64
           - os: ubuntu-latest
             goos: linux
             goarch: amd64

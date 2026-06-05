@@ -9,6 +9,17 @@ Kueri desktop is a **single Go binary** that bundles:
 
 Default URL when running: `http://127.0.0.1:8765`
 
+### GitHub Release downloads
+
+| Platform | Artifact |
+|----------|----------|
+| macOS Apple Silicon (M1+) | `kueri-desktop-darwin-arm64` |
+| macOS Intel (x86_64) | `kueri-desktop-darwin-amd64` |
+| Linux amd64 | `kueri-desktop-linux-amd64` |
+| Windows amd64 | `kueri-desktop-windows-amd64.exe` |
+
+Each file is a single executable — `chmod +x` on macOS/Linux, then run it. No `.dmg` or `.app` installer.
+
 ---
 
 ## Versioning

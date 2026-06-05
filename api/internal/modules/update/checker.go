@@ -98,6 +98,9 @@ func (c *Checker) Check(ctx context.Context) (*CheckResult, error) {
 
 	platform := RuntimePlatform()
 	artifact, ok := manifest.Platforms[platform]
+	if !ok && platform == "darwin-universal" {
+		artifact, ok = manifest.Platforms["darwin-arm64"]
+	}
 	if !ok {
 		return nil, fmt.Errorf("no artifact for platform %q", platform)
 	}
@@ -141,7 +144,7 @@ func (c *Checker) Check(ctx context.Context) (*CheckResult, error) {
 func RuntimePlatform() string {
 	switch runtime.GOOS {
 	case "darwin":
-		return "darwin-universal"
+		return "darwin-" + runtime.GOARCH
 	case "windows":
 		return "windows-amd64"
 	case "linux":

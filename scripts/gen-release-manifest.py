@@ -13,8 +13,10 @@ from pathlib import Path
 
 def platform_for(name: str) -> str | None:
     lower = name.lower()
-    if "darwin" in lower or "macos" in lower:
-        return "darwin-universal"
+    if "darwin-arm64" in lower or "darwin-universal" in lower:
+        return "darwin-arm64"
+    if "darwin-amd64" in lower:
+        return "darwin-amd64"
     if "windows" in lower or lower.endswith(".exe"):
         return "windows-amd64"
     if "linux" in lower or lower.endswith(".appimage"):
