@@ -14,14 +14,20 @@ import (
 
 	"github.com/tetradatateknologi/kueri/api/internal/config"
 	"github.com/tetradatateknologi/kueri/api/internal/desktop"
+	"github.com/tetradatateknologi/kueri/api/internal/desktop/cli"
 	"github.com/tetradatateknologi/kueri/api/internal/logger"
 	"github.com/tetradatateknologi/kueri/api/internal/modules/update"
 	"github.com/tetradatateknologi/kueri/api/internal/persistence"
+	"github.com/tetradatateknologi/kueri/api/internal/seed"
 	"github.com/tetradatateknologi/kueri/api/internal/server"
 	"github.com/tetradatateknologi/kueri/api/internal/version"
 )
 
 func main() {
+	if cli.Handle(os.Args[1:]) {
+		return
+	}
+
 	cfg, dataDir, pg, err := bootstrap()
 	if err != nil {
 		slog.Error("desktop bootstrap failed", "error", err)
@@ -38,6 +44,11 @@ func main() {
 		os.Exit(1)
 	}
 	defer pool.Close()
+
+	if err := seed.EnsureDevData(ctx, pool, cfg); err != nil {
+		slog.Error("failed to seed desktop data", "error", err)
+		os.Exit(1)
+	}
 
 	staticFS, err := desktop.WebAssets()
 	if err != nil {

@@ -1,0 +1,23 @@
+{
+  "version": "1.2.2",
+  "release_date": "2026-06-05",
+  "min_supported_version": "0.1.0",
+  "notes_url": "https://github.com/tetradatateknologi/kueri/releases/tag/v1.2.2",
+  "platforms": {
+    "darwin-amd64": {
+      "url": "https://github.com/tetradatateknologi/kueri/releases/download/v1.2.2/kueri-desktop-darwin-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "darwin-arm64": {
+      "url": "https://github.com/tetradatateknologi/kueri/releases/download/v1.2.2/kueri-desktop-darwin-arm64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    },
+    "linux-amd64": {
+      "url": "https://github.com/tetradatateknologi/kueri/releases/download/v1.2.2/kueri-desktop-linux-amd64",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+      "size": 0
+    }
+  }
+}

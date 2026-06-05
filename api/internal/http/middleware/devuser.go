@@ -20,7 +20,7 @@ func DevUser(pool *pgxpool.Pool, email string) echo.MiddlewareFunc {
 		return func(c echo.Context) error {
 			user, err := q.GetUserByEmail(c.Request().Context(), email)
 			if err != nil {
-				return apphttp.NotFound(c, "Dev user not found; run make seed")
+				return apphttp.NotFound(c, "User not found; restart the app or run make seed in development")
 			}
 			ctx := context.WithValue(c.Request().Context(), userContextKey, user)
 			c.SetRequest(c.Request().WithContext(ctx))
