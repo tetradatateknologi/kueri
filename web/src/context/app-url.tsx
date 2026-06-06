@@ -22,6 +22,9 @@ type AppUrlContextValue = {
   snapshot: AppUrlSnapshot;
   /** Increments on browser back/forward (popstate). */
   historyEpoch: number;
+  /** Sidebar-only project/workspace filter. Does not define active script identity. */
+  setSidebarFilterProject: (workspace: Workspace | null) => void;
+  /** @deprecated Use setSidebarFilterProject */
   setProjectFilter: (workspace: Workspace | null) => void;
   setActiveScriptId: (id: number | null) => void;
   setActiveConnectionId: (id: number | null) => void;
@@ -44,7 +47,7 @@ export function AppUrlProvider({ children }: { children: ReactNode }) {
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
 
-  const setProjectFilter = useCallback((workspace: Workspace | null) => {
+  const setSidebarFilterProject = useCallback((workspace: Workspace | null) => {
     const project = workspace ? workspaceToProjectParam(workspace) : null;
     writeAppUrl({ project });
     setSnapshot((s) => ({ ...s, project }));
@@ -94,7 +97,8 @@ export function AppUrlProvider({ children }: { children: ReactNode }) {
     () => ({
       snapshot,
       historyEpoch,
-      setProjectFilter,
+      setSidebarFilterProject,
+      setProjectFilter: setSidebarFilterProject,
       setActiveScriptId,
       setActiveConnectionId,
       syncAppView,
@@ -103,7 +107,7 @@ export function AppUrlProvider({ children }: { children: ReactNode }) {
     [
       snapshot,
       historyEpoch,
-      setProjectFilter,
+      setSidebarFilterProject,
       setActiveScriptId,
       setActiveConnectionId,
       syncAppView,
@@ -120,10 +124,15 @@ export function useAppUrl() {
   return ctx;
 }
 
-export function useProjectWorkspaceId(workspaces: Workspace[]): number | null {
+export function useSidebarFilterProjectId(workspaces: Workspace[]): number | null {
   const { snapshot } = useAppUrl();
   return useMemo(() => {
     if (!snapshot.project) return null;
     return resolveWorkspaceByProjectParam(snapshot.project, workspaces)?.id ?? null;
   }, [snapshot.project, workspaces]);
+}
+
+/** @deprecated Use useSidebarFilterProjectId */
+export function useProjectWorkspaceId(workspaces: Workspace[]): number | null {
+  return useSidebarFilterProjectId(workspaces);
 }
