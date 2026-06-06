@@ -1,14 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import {
-  ChevronRight,
-  FileCode2,
-  FolderGit2,
-  Plus,
-  Search,
-  Settings,
-  X,
-} from "lucide-react";
+import { ChevronRight, FileCode2, FolderGit2, Plus, Search, Settings, X } from "lucide-react";
 
 import { ConfirmDeleteDialog } from "@/components/kueri/ConfirmDeleteDialog";
 import { ProjectFilterCombobox } from "@/components/kueri/ProjectFilterCombobox";
@@ -33,17 +25,10 @@ import { useSelectConnection } from "@/context/select-connection";
 import { ApiError } from "@/lib/api/http";
 import { deleteScript } from "@/lib/api/scripts";
 import type { Connection, Script } from "@/lib/api/types";
-import {
-  deleteConnection,
-  deleteWorkspace,
-  updateWorkspace,
-} from "@/lib/api/workspaces";
+import { deleteConnection, deleteWorkspace, updateWorkspace } from "@/lib/api/workspaces";
 import { showSuccess, showValidationError } from "@/lib/toasts";
 import { cn } from "@/lib/utils";
-import {
-  useWorkspaceStore,
-  type SelectedConnection,
-} from "@/stores/workspace-store";
+import { useWorkspaceStore, type SelectedConnection } from "@/stores/workspace-store";
 
 const envDot: Record<string, string> = {
   dev: "bg-env-dev",
@@ -85,7 +70,7 @@ export function Sidebar() {
     isLoading,
     isTogglingFavorite,
     openScript,
-    closeScript,
+    closeTab,
     createNewScript,
     openEditScript,
     toggleFavorite,
@@ -166,7 +151,7 @@ export function Sidebar() {
       } else {
         await queryClient.invalidateQueries({ queryKey: ["scripts"] });
         queryClient.removeQueries({ queryKey: ["script", target.id] });
-        closeScript(target.id);
+        closeTab(String(target.id));
         showSuccess(`Script "${target.name}" deleted`);
       }
       setDeleteTarget(null);
@@ -406,7 +391,9 @@ export function Sidebar() {
                         {open && (
                           <div className="ml-6 mt-0.5 mb-1 space-y-1 border-l border-border/70 pl-2">
                             {ws.connections.length === 0 && (
-                              <p className="px-2 py-1 text-[10px] text-muted-foreground">No connections</p>
+                              <p className="px-2 py-1 text-[10px] text-muted-foreground">
+                                No connections
+                              </p>
                             )}
                             {ws.connections.map((c) => (
                               <div key={c.id} className="group flex items-center gap-0.5">
@@ -459,7 +446,9 @@ export function Sidebar() {
                                 </button>
                               </div>
                               {(scriptsByWorkspace.get(ws.id) ?? []).length === 0 ? (
-                                <p className="px-2 py-1 text-[10px] text-muted-foreground">No scripts</p>
+                                <p className="px-2 py-1 text-[10px] text-muted-foreground">
+                                  No scripts
+                                </p>
                               ) : (
                                 <div className="space-y-0.5">
                                   {(scriptsByWorkspace.get(ws.id) ?? []).map((s) => (
@@ -491,7 +480,11 @@ export function Sidebar() {
                                         className="mt-1"
                                         onEdit={() => openEditScript(s.id)}
                                         onDelete={() =>
-                                          setDeleteTarget({ kind: "script", id: s.id, name: s.title })
+                                          setDeleteTarget({
+                                            kind: "script",
+                                            id: s.id,
+                                            name: s.title,
+                                          })
                                         }
                                       />
                                     </div>

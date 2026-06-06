@@ -4,16 +4,8 @@ import { EditorEmptyState } from "@/components/kueri/EditorEmptyState";
 import { EditorPane } from "@/components/kueri/EditorPane";
 import { JsonResultsView } from "@/components/kueri/JsonResultsView";
 import { ResultsGrid } from "@/components/kueri/ResultsGrid";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { Script } from "@/lib/api/types";
 import type { QueryResult } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
@@ -25,8 +17,10 @@ type EditorResultsStackProps = {
   draftSql: string;
   setDraftSql: (sql: string) => void;
   runQuery: () => void;
+  activeTabId: string | null;
   activeScriptId: number | null;
   openEditScript: (id: number) => void;
+  openEditTempTab: (tabId: string) => void;
   favoriteScripts: Script[];
   createNewScript: () => void | Promise<void>;
   openScript: (id: number) => void;
@@ -46,8 +40,10 @@ export function EditorResultsStack({
   draftSql,
   setDraftSql,
   runQuery,
+  activeTabId,
   activeScriptId,
   openEditScript,
+  openEditTempTab,
   favoriteScripts,
   createNewScript,
   openScript,
@@ -74,7 +70,11 @@ export function EditorResultsStack({
             onChange={setDraftSql}
             onRun={runQuery}
             onEditScript={() => {
-              if (activeScriptId != null) openEditScript(activeScriptId);
+              if (activeScriptId != null) {
+                openEditScript(activeScriptId);
+              } else if (activeTabId != null) {
+                openEditTempTab(activeTabId);
+              }
             }}
           />
         ) : (
