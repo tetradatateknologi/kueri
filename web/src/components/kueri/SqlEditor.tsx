@@ -6,11 +6,12 @@ import {
   toggleComment,
 } from "@codemirror/commands";
 import { syntaxHighlighting, defaultHighlightStyle } from "@codemirror/language";
-import { oneDark } from "@codemirror/theme-one-dark";
-import { EditorState, Prec } from "@codemirror/state";
+import { Compartment, EditorState, Prec } from "@codemirror/state";
 import { EditorView, keymap, lineNumbers } from "@codemirror/view";
 import { useEffect, useRef } from "react";
 
+import { useTheme } from "@/context/theme";
+import { getEditorThemeExtensions } from "@/lib/codemirror-theme";
 import { cn } from "@/lib/utils";
 
 type SqlEditorProps = {
@@ -30,8 +31,10 @@ export function SqlEditor({
   readOnly = false,
   className,
 }: SqlEditorProps) {
+  const { resolvedTheme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
+  const themeCompartmentRef = useRef(new Compartment());
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onRunRef = useRef(onRun);
@@ -76,22 +79,12 @@ export function SqlEditor({
         history(),
         sql(),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-        oneDark,
+        themeCompartmentRef.current.of(getEditorThemeExtensions(resolvedTheme)),
         Prec.high(runKeymap),
         keymap.of([...defaultKeymap, ...historyKeymap]),
         EditorView.lineWrapping,
         EditorState.readOnly.of(readOnly),
         updateListener,
-        EditorView.theme({
-          "&": { height: "100%", fontSize: "13px" },
-          ".cm-scroller": { fontFamily: "var(--font-mono)" },
-          ".cm-content": { padding: "12px 0" },
-          ".cm-gutters": {
-            backgroundColor: "transparent",
-            borderRight: "1px solid var(--border)",
-            color: "var(--muted-foreground)",
-          },
-        }),
       ],
     });
 
@@ -104,6 +97,14 @@ export function SqlEditor({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount once
   }, [readOnly]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: themeCompartmentRef.current.reconfigure(getEditorThemeExtensions(resolvedTheme)),
+    });
+  }, [resolvedTheme]);
 
   useEffect(() => {
     const view = viewRef.current;
