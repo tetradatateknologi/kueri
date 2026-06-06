@@ -14,8 +14,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import type { Script } from "@/lib/api/types";
-import type { QueryResult } from "@/lib/api/types";
+import type { QueryResult, ResultColumnFilter, Script } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import type { ResultsView } from "@/stores/workspace-store";
 
@@ -37,6 +36,9 @@ type EditorResultsStackProps = {
   executeMutationIsPending: boolean;
   lastQueryError: string | null;
   onLoadMore?: () => void;
+  activeFilters?: ResultColumnFilter[];
+  onFiltersChange?: (filters: ResultColumnFilter[]) => void;
+  onClearAllFilters?: () => void;
   setExportOpen: (open: boolean) => void;
 };
 
@@ -58,6 +60,9 @@ export function EditorResultsStack({
   executeMutationIsPending,
   lastQueryError,
   onLoadMore,
+  activeFilters,
+  onFiltersChange,
+  onClearAllFilters,
   setExportOpen,
 }: EditorResultsStackProps) {
   return (
@@ -158,6 +163,9 @@ export function EditorResultsStack({
                 isLoading={executeMutationIsPending}
                 error={lastQueryError}
                 onLoadMore={onLoadMore}
+                activeFilters={activeFilters}
+                onFiltersChange={onFiltersChange}
+                onClearAllFilters={onClearAllFilters}
               />
             ) : (
               <JsonResultsView result={lastResult} />

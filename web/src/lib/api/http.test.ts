@@ -20,12 +20,46 @@ describe("apiFetch", () => {
     expect(data.status).toBe("ok");
   });
 
+  it("sends column filters when provided", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          columns: [{ name: "name", filterable: true }],
+          rows: [],
+          rowCount: 0,
+          durationMs: 1,
+          cached: false,
+          limit: 20,
+          offset: 0,
+          hasMore: false,
+          autoLimitApplied: true,
+          filtering: { enabled: true, mode: "server", appliedFilters: [] },
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await executeQuery({
+      sql: "SELECT name FROM users",
+      connection_id: 1,
+      filters: [{ column: "name", operator: "contains", value: "hanif" }],
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      sql: "SELECT name FROM users",
+      connection_id: 1,
+      filters: [{ column: "name", operator: "contains", value: "hanif" }],
+    });
+  });
+
   it("sends pagination params for load more requests", async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
         data: {
-          columns: ["id"],
+          columns: [{ name: "id", filterable: true }],
           rows: [[2]],
           rowCount: 1,
           durationMs: 1,
@@ -34,6 +68,11 @@ describe("apiFetch", () => {
           offset: 20,
           hasMore: false,
           autoLimitApplied: true,
+          filtering: {
+            enabled: true,
+            mode: "server",
+            appliedFilters: [],
+          },
         },
       }),
     });

@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
-import type { QueryResult } from "@/lib/api/types";
+import type { QueryResult, ResultColumnFilter } from "@/lib/api/types";
 
 export type WorkspaceEnv = "Development" | "Staging" | "Production";
 export type ResultsView = "results" | "json";
@@ -32,6 +32,7 @@ type WorkspaceUiState = {
   lastQueryError: string | null;
   lastQuerySql: string | null;
   lastQueryConnectionId: number | null;
+  resultFilters: ResultColumnFilter[];
   resultsView: ResultsView;
   queryHistory: QueryHistoryEntry[];
   setHasHydrated: (v: boolean) => void;
@@ -40,6 +41,8 @@ type WorkspaceUiState = {
   setLastResult: (result: QueryResult | null) => void;
   setLastQueryError: (message: string | null) => void;
   setLastQueryContext: (sql: string, connectionId: number) => void;
+  setResultFilters: (filters: ResultColumnFilter[]) => void;
+  clearResultFilters: () => void;
   appendResultRows: (rows: unknown[][], hasMore: boolean) => void;
   setResultLoadingMore: (loading: boolean) => void;
   setResultsView: (view: ResultsView) => void;
@@ -56,6 +59,7 @@ export const useWorkspaceStore = create<WorkspaceUiState>()(
       lastQueryError: null,
       lastQuerySql: null,
       lastQueryConnectionId: null,
+      resultFilters: [],
       resultsView: "results",
       queryHistory: [],
 
@@ -94,6 +98,10 @@ export const useWorkspaceStore = create<WorkspaceUiState>()(
 
       setLastQueryContext: (sql, connectionId) =>
         set({ lastQuerySql: sql, lastQueryConnectionId: connectionId }),
+
+      setResultFilters: (filters) => set({ resultFilters: filters }),
+
+      clearResultFilters: () => set({ resultFilters: [] }),
 
       appendResultRows: (rows, hasMore) =>
         set((s) => {

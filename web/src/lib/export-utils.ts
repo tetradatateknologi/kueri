@@ -1,4 +1,5 @@
 import type { QueryResult } from "@/lib/api/types";
+import { queryResultColumnNames } from "@/lib/api/types";
 import type { WorkspaceEnv } from "@/stores/workspace-store";
 
 export function envToApiEnv(env: WorkspaceEnv): "development" | "staging" | "production" {
@@ -45,7 +46,7 @@ export function resultToCsv(result: QueryResult): string {
     }
     return s;
   };
-  const lines = [result.columns.map(escape).join(",")];
+  const lines = [queryResultColumnNames(result.columns).map(escape).join(",")];
   for (const row of result.rows) {
     lines.push(row.map(escape).join(","));
   }

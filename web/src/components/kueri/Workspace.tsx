@@ -24,6 +24,7 @@ import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
 import { useKueriHotkeys } from "@/hooks/use-kueri-hotkeys";
 import { formatShortcut } from "@/lib/hotkeys";
+import type { ResultColumnFilter } from "@/lib/api/types";
 import { ApiError, executeQuery } from "@/lib/api/http";
 import { DEFAULT_QUERY_LIMIT } from "@/lib/api/query-config";
 import { useExecuteQuery } from "@/lib/api/queries";
@@ -68,9 +69,12 @@ export function Workspace() {
   const resultsView = useWorkspaceStore((s) => s.resultsView);
   const lastQuerySql = useWorkspaceStore((s) => s.lastQuerySql);
   const lastQueryConnectionId = useWorkspaceStore((s) => s.lastQueryConnectionId);
+  const resultFilters = useWorkspaceStore((s) => s.resultFilters);
   const setLastResult = useWorkspaceStore((s) => s.setLastResult);
   const setLastQueryError = useWorkspaceStore((s) => s.setLastQueryError);
   const setLastQueryContext = useWorkspaceStore((s) => s.setLastQueryContext);
+  const setResultFilters = useWorkspaceStore((s) => s.setResultFilters);
+  const clearResultFilters = useWorkspaceStore((s) => s.clearResultFilters);
   const appendResultRows = useWorkspaceStore((s) => s.appendResultRows);
   const setResultLoadingMore = useWorkspaceStore((s) => s.setResultLoadingMore);
   const setResultsView = useWorkspaceStore((s) => s.setResultsView);
@@ -121,12 +125,14 @@ export function Workspace() {
       return;
     }
 
+    clearResultFilters();
+
     executeMutation.mutate(
       { sql, connection_id: connectionId },
       {
         onSuccess: (data) => {
           setLastQueryContext(sql, connectionId);
-          setLastResult({ ...data, loadingMore: false });
+          setLastResult({ ...data, loadingMore: false, loadingFilter: false });
           pushHistory({
             sql,
             env,
@@ -158,7 +164,75 @@ export function Workspace() {
     setLastResult,
     env,
     hasOpenTab,
+    clearResultFilters,
   ]);
+
+  const fetchWithFilters = useCallback(
+    (filters: ResultColumnFilter[], options?: { append?: boolean }) => {
+      const sql = lastQuerySql?.trim();
+      const connectionId = lastQueryConnectionId;
+      if (!sql || connectionId == null) return;
+
+      if (options?.append) {
+        setResultLoadingMore(true);
+      } else {
+        setLastResult(
+          lastResult
+            ? { ...lastResult, loadingFilter: true, loadingMore: false }
+            : null,
+        );
+      }
+
+      const offset = options?.append ? (lastResult?.rows.length ?? 0) : 0;
+
+      void executeQuery({
+        sql,
+        connection_id: connectionId,
+        limit: DEFAULT_QUERY_LIMIT,
+        offset,
+        filters: filters.length > 0 ? filters : undefined,
+      })
+        .then((data) => {
+          if (options?.append) {
+            appendResultRows(data.rows, data.hasMore);
+          } else {
+            setLastResult({ ...data, loadingMore: false, loadingFilter: false });
+          }
+        })
+        .catch((err) => {
+          setResultLoadingMore(false);
+          if (!options?.append && lastResult) {
+            setLastResult({ ...lastResult, loadingFilter: false });
+          }
+          const message =
+            err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
+          setLastQueryError(message);
+          showQueryErrorToast(message);
+        });
+    },
+    [
+      appendResultRows,
+      lastQueryConnectionId,
+      lastQuerySql,
+      lastResult,
+      setLastQueryError,
+      setLastResult,
+      setResultLoadingMore,
+    ],
+  );
+
+  const handleFiltersChange = useCallback(
+    (filters: ResultColumnFilter[]) => {
+      setResultFilters(filters);
+      fetchWithFilters(filters);
+    },
+    [fetchWithFilters, setResultFilters],
+  );
+
+  const handleClearAllFilters = useCallback(() => {
+    clearResultFilters();
+    fetchWithFilters([]);
+  }, [clearResultFilters, fetchWithFilters]);
 
   const loadMoreRows = useCallback(() => {
     const sql = lastQuerySql?.trim();
@@ -167,33 +241,8 @@ export function Workspace() {
       return;
     }
 
-    setResultLoadingMore(true);
-    const offset = lastResult.rows.length;
-
-    void executeQuery({
-      sql,
-      connection_id: connectionId,
-      limit: DEFAULT_QUERY_LIMIT,
-      offset,
-    })
-      .then((data) => {
-        appendResultRows(data.rows, data.hasMore);
-      })
-      .catch((err) => {
-        setResultLoadingMore(false);
-        const message =
-          err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
-        setLastQueryError(message);
-        showQueryErrorToast(message);
-      });
-  }, [
-    appendResultRows,
-    lastQueryConnectionId,
-    lastQuerySql,
-    lastResult,
-    setLastQueryError,
-    setResultLoadingMore,
-  ]);
+    fetchWithFilters(resultFilters, { append: true });
+  }, [fetchWithFilters, lastQueryConnectionId, lastQuerySql, lastResult, resultFilters]);
 
   const cycleConnection = useCallback(() => {
     if (!selectedConnection) return;
@@ -547,6 +596,9 @@ export function Workspace() {
                 executeMutationIsPending={executeMutation.isPending}
                 lastQueryError={lastQueryError}
                 onLoadMore={loadMoreRows}
+                activeFilters={resultFilters}
+                onFiltersChange={handleFiltersChange}
+                onClearAllFilters={handleClearAllFilters}
                 setExportOpen={setExportOpen}
               />
             </ResizablePanel>
@@ -570,6 +622,9 @@ export function Workspace() {
             executeMutationIsPending={executeMutation.isPending}
             lastQueryError={lastQueryError}
             onLoadMore={loadMoreRows}
+            activeFilters={resultFilters}
+            onFiltersChange={handleFiltersChange}
+            onClearAllFilters={handleClearAllFilters}
             setExportOpen={setExportOpen}
           />
         )}
