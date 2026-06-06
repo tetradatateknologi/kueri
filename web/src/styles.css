@@ -49,7 +49,59 @@
 }
 
 :root {
+  color-scheme: light;
   --radius: 0.5rem;
+
+  /* Light VS Code-like palette */
+  --background: oklch(0.99 0.003 250);
+  --foreground: oklch(0.22 0.015 250);
+  --surface-1: oklch(0.97 0.006 250);
+  --surface-2: oklch(0.945 0.008 250);
+
+  --card: oklch(0.99 0.003 250);
+  --card-foreground: oklch(0.22 0.015 250);
+  --popover: oklch(0.99 0.003 250);
+  --popover-foreground: oklch(0.22 0.015 250);
+
+  --primary: oklch(0.52 0.18 240);
+  --primary-foreground: oklch(0.99 0.003 250);
+
+  --secondary: oklch(0.955 0.008 250);
+  --secondary-foreground: oklch(0.22 0.015 250);
+  --accent: oklch(0.94 0.01 250);
+  --accent-foreground: oklch(0.22 0.015 250);
+
+  --muted: oklch(0.955 0.008 250);
+  --muted-foreground: oklch(0.48 0.015 250);
+  --skeleton: oklch(0.91 0.006 264);
+
+  --destructive: oklch(0.55 0.22 27);
+  --destructive-foreground: oklch(0.99 0.003 250);
+
+  --border: oklch(0.88 0.01 250);
+  --input: oklch(0.92 0.008 250);
+  --ring: oklch(0.52 0.18 240);
+
+  --neon: oklch(0.58 0.2 145);
+  --electric: oklch(0.52 0.18 240);
+
+  --env-dev: oklch(0.52 0.18 145);
+  --env-staging: oklch(0.58 0.16 85);
+  --env-prod: oklch(0.52 0.2 27);
+
+  --syntax-keyword: oklch(0.48 0.18 320);
+  --syntax-string: oklch(0.48 0.14 85);
+  --syntax-number: oklch(0.48 0.14 145);
+  --syntax-comment: oklch(0.58 0.02 250);
+  --syntax-function: oklch(0.48 0.16 240);
+
+  --sidebar: oklch(0.975 0.005 250);
+  --sidebar-foreground: oklch(0.28 0.015 250);
+  --sidebar-border: oklch(0.9 0.01 250);
+}
+
+.dark {
+  color-scheme: dark;
 
   /* Deep dark VS Code-like palette */
   --background: oklch(0.18 0.012 250);
@@ -62,19 +114,16 @@
   --popover: oklch(0.215 0.013 250);
   --popover-foreground: oklch(0.92 0.01 250);
 
-  /* Electric blue primary */
   --primary: oklch(0.72 0.18 240);
   --primary-foreground: oklch(0.15 0.02 250);
 
   --secondary: oklch(0.26 0.015 250);
   --secondary-foreground: oklch(0.92 0.01 250);
-  /* Subtle grey for menus, buttons, and other hover/focus surfaces */
   --accent: oklch(0.30 0.013 250);
   --accent-foreground: oklch(0.92 0.01 250);
 
   --muted: oklch(0.26 0.013 250);
   --muted-foreground: oklch(0.62 0.015 250);
-  /* Neutral grey loading placeholders (no brand tint) */
   --skeleton: oklch(0.32 0.006 264);
 
   --destructive: oklch(0.65 0.22 27);

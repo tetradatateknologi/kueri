@@ -30,6 +30,8 @@ type WorkspaceUiState = {
   selectedConnection: SelectedConnection | null;
   lastResult: QueryResult | null;
   lastQueryError: string | null;
+  lastQuerySql: string | null;
+  lastQueryConnectionId: number | null;
   resultsView: ResultsView;
   queryHistory: QueryHistoryEntry[];
   setHasHydrated: (v: boolean) => void;
@@ -37,6 +39,9 @@ type WorkspaceUiState = {
   setSelectedConnection: (conn: SelectedConnection | null) => void;
   setLastResult: (result: QueryResult | null) => void;
   setLastQueryError: (message: string | null) => void;
+  setLastQueryContext: (sql: string, connectionId: number) => void;
+  appendResultRows: (rows: unknown[][], hasMore: boolean) => void;
+  setResultLoadingMore: (loading: boolean) => void;
   setResultsView: (view: ResultsView) => void;
   pushHistory: (entry: Omit<QueryHistoryEntry, "id">) => void;
 };
@@ -49,6 +54,8 @@ export const useWorkspaceStore = create<WorkspaceUiState>()(
       selectedConnection: null,
       lastResult: null,
       lastQueryError: null,
+      lastQuerySql: null,
+      lastQueryConnectionId: null,
       resultsView: "results",
       queryHistory: [],
 
@@ -69,8 +76,44 @@ export const useWorkspaceStore = create<WorkspaceUiState>()(
         set({ selectedConnection: conn, env: envMap[conn.env] });
       },
 
-      setLastResult: (result) => set({ lastResult: result, lastQueryError: null }),
-      setLastQueryError: (message) => set({ lastQueryError: message, lastResult: null }),
+      setLastResult: (result) =>
+        set((s) => ({
+          lastResult: result,
+          lastQueryError: null,
+          ...(result === null
+            ? { lastQuerySql: null, lastQueryConnectionId: null }
+            : { lastQuerySql: s.lastQuerySql, lastQueryConnectionId: s.lastQueryConnectionId }),
+        })),
+      setLastQueryError: (message) =>
+        set({
+          lastQueryError: message,
+          lastResult: null,
+          lastQuerySql: null,
+          lastQueryConnectionId: null,
+        }),
+
+      setLastQueryContext: (sql, connectionId) =>
+        set({ lastQuerySql: sql, lastQueryConnectionId: connectionId }),
+
+      appendResultRows: (rows, hasMore) =>
+        set((s) => {
+          if (!s.lastResult) return s;
+          return {
+            lastResult: {
+              ...s.lastResult,
+              rows: [...s.lastResult.rows, ...rows],
+              rowCount: s.lastResult.rows.length + rows.length,
+              hasMore,
+              loadingMore: false,
+            },
+          };
+        }),
+
+      setResultLoadingMore: (loading) =>
+        set((s) => {
+          if (!s.lastResult) return s;
+          return { lastResult: { ...s.lastResult, loadingMore: loading } };
+        }),
       setResultsView: (view) => set({ resultsView: view }),
 
       pushHistory: (entry) => {

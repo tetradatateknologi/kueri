@@ -17,12 +17,8 @@ export function EditorEmptyState({ favorites, onCreateScript, onOpenScript }: Ed
       aria-label="SQL editor"
       className="bg-surface-1"
       icon={FileCode2}
-      title="Open or create a script"
-      hint={
-        favorites.length > 0
-          ? "Open a favorite below or pick one from the sidebar"
-          : "Click + in the tab bar or pick one from the sidebar"
-      }
+      title="No script open"
+      hint="Select a script from the sidebar or create a new SQL script to start."
       action={
         <div className="flex flex-col items-center gap-3 mt-1 w-full max-w-sm">
           {favorites.length > 0 && (

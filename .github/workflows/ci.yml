@@ -91,7 +91,7 @@ jobs:
       - name: Build desktop bundle
         run: |
           VERSION="$(tr -d '[:space:]' < VERSION)"
-          cd web && npm ci && VITE_DESKTOP_BUILD=1 npm run build
+          (cd web && npm ci && VITE_DESKTOP_BUILD=1 npm run build)
           rm -rf api/internal/desktop/webdist
           mkdir -p api/internal/desktop/webdist
           cp -R web/dist/. api/internal/desktop/webdist/

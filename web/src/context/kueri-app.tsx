@@ -28,7 +28,12 @@ import {
 } from "@/lib/script-title";
 import { listWorkspaces } from "@/lib/api/workspaces";
 import { useAppUrl } from "@/context/app-url";
-import { readAppUrlFromLocation } from "@/lib/app-url";
+import {
+  buildOpenedTabs,
+  isScriptDirty,
+  resolveNextActiveTabId,
+  type EditorTab,
+} from "@/lib/editor-tabs";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 type EditScriptTarget = { id: number; title: string; tags: string[] };
@@ -43,12 +48,15 @@ type KueriAppContextValue = {
   isTogglingFavorite: boolean;
   error: Error | null;
   openScriptIds: number[];
+  openedTabs: EditorTab[];
   activeScriptId: number | null;
   activeScript: Script | undefined;
+  activeTab: EditorTab | undefined;
   draftSql: string;
   setDraftSql: (sql: string) => void;
   openScript: (id: number) => void;
   closeScript: (id: number) => void;
+  isScriptDirty: (id: number) => boolean;
   setActiveScriptId: (id: number) => void;
   saveActiveScript: () => Promise<void>;
   isSaving: boolean;
@@ -132,17 +140,6 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     [activeScriptId, draftSql, loadDraftForScript, persistDraftForScript, setUrlScriptId],
   );
 
-  useEffect(() => {
-    const scripts = scriptsQuery.data;
-    if (!scripts?.length || openScriptIds.length > 0) return;
-    if (readAppUrlFromLocation().scriptId != null) return;
-    const firstId = scripts[0].id;
-    setOpenScriptIds([firstId]);
-    setActiveScriptId(firstId);
-    setUrlScriptId(firstId);
-    loadDraftForScript(firstId);
-  }, [scriptsQuery.data, openScriptIds.length, loadDraftForScript, setUrlScriptId]);
-
   const saveMutation = useMutation({
     mutationFn: () => updateScript(activeScriptId!, { sql_text: draftSql }),
     onSuccess: (script) => {
@@ -214,7 +211,23 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   });
 
   const scripts = scriptsQuery.data ?? [];
+  const workspaces = workspacesQuery.data ?? [];
   const favoriteScripts = useMemo(() => getFavoriteScripts(scripts), [scripts]);
+
+  const openedTabs = useMemo(
+    () => buildOpenedTabs(openScriptIds, scripts, workspaces, draftByScriptIdRef.current),
+    [openScriptIds, scripts, workspaces, draftSql],
+  );
+
+  const activeTab = useMemo(
+    () => openedTabs.find((tab) => tab.scriptId === activeScriptId),
+    [openedTabs, activeScriptId],
+  );
+
+  const checkScriptDirty = useCallback(
+    (id: number) => isScriptDirty(id, draftByScriptIdRef.current, scripts),
+    [scripts, draftSql],
+  );
 
   const toggleFavorite = useCallback(
     (id: number) => {
@@ -276,7 +289,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       setOpenScriptIds((prev) => {
         const next = prev.filter((x) => x !== id);
         if (activeScriptId === id) {
-          const nextActive = next[0] ?? null;
+          const nextActive = resolveNextActiveTabId(prev, id);
           setActiveScriptId(nextActive);
           setUrlScriptId(nextActive);
           if (nextActive != null) {
@@ -345,12 +358,15 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       isTogglingFavorite: favoriteMutation.isPending,
       error,
       openScriptIds,
+      openedTabs,
       activeScriptId,
       activeScript: activeScriptQuery.data,
+      activeTab,
       draftSql,
       setDraftSql,
       openScript,
       closeScript,
+      isScriptDirty: checkScriptDirty,
       setActiveScriptId: switchActiveScript,
       saveActiveScript: async () => {
         if (activeScriptId == null) return;
@@ -372,11 +388,14 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       favoriteMutation.isPending,
       error,
       openScriptIds,
+      openedTabs,
       activeScriptId,
       activeScriptQuery.data,
+      activeTab,
       draftSql,
       openScript,
       closeScript,
+      checkScriptDirty,
       switchActiveScript,
       saveMutation,
       refetchAll,

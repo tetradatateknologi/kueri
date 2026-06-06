@@ -4,6 +4,8 @@ A modern, open-source database workspace for exploring schemas, running queries,
 
 Kueri ships as a **desktop app** (single binary with embedded PostgreSQL and UI) and as a **developer monorepo** (Go API + React web app) for contributors.
 
+![Kueri — open-source database workspace](docs/screenshot.png)
+
 ---
 
 ## Features

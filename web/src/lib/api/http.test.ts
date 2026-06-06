@@ -20,6 +20,41 @@ describe("apiFetch", () => {
     expect(data.status).toBe("ok");
   });
 
+  it("sends pagination params for load more requests", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: {
+          columns: ["id"],
+          rows: [[2]],
+          rowCount: 1,
+          durationMs: 1,
+          cached: false,
+          limit: 20,
+          offset: 20,
+          hasMore: false,
+          autoLimitApplied: true,
+        },
+      }),
+    });
+    vi.stubGlobal("fetch", fetchMock);
+
+    await executeQuery({
+      sql: "SELECT * FROM users",
+      connection_id: 1,
+      limit: 20,
+      offset: 20,
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(String(init.body))).toEqual({
+      sql: "SELECT * FROM users",
+      connection_id: 1,
+      limit: 20,
+      offset: 20,
+    });
+  });
+
   it("throws ApiError on error envelope", async () => {
     vi.stubGlobal(
       "fetch",
