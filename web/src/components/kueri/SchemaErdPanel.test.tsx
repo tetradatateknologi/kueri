@@ -142,4 +142,16 @@ describe("SchemaErdPanel", () => {
     fireEvent.click(portsToggle);
     expect(portsToggle).toHaveAttribute("aria-checked", "false");
   });
+
+  it("opens fullscreen ERD from the expand button", async () => {
+    vi.mocked(fetchConnectionErd).mockResolvedValue(sampleErd);
+    renderPanel(1);
+    await waitFor(() => {
+      expect(screen.getByTestId("react-flow")).toBeInTheDocument();
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open fullscreen" }));
+    expect(screen.getByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByText(/Entity Relationship Diagram/i)).toBeInTheDocument();
+    expect(screen.getByText(/ERD is open in fullscreen/i)).toBeInTheDocument();
+  });
 });
