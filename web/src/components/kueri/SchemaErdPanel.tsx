@@ -31,6 +31,7 @@ import {
   RotateCcw,
   Save,
   Search,
+  Table2,
   Wand2,
 } from "lucide-react";
 
@@ -433,27 +434,36 @@ function ErdTableList({
 }) {
   if (!erd.metadata || erd.metadata.tables.length === 0) return null;
 
+  const visibleCount = erd.metadata.tables.length - erd.hiddenTableIds.size;
+
   return (
     <div
       className={cn(
-        "overflow-y-auto border-border/60 px-2 py-1.5",
-        variant === "compact" ? "shrink-0 max-h-28 border-b" : "flex-1 min-h-0",
+        "overflow-y-auto border-border/60",
+        variant === "compact" ? "shrink-0 max-h-28 border-b px-2 py-1.5" : "flex-1 min-h-0 px-2.5 py-2",
         className,
       )}
     >
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-[10px] font-medium text-muted-foreground">Tables</span>
-        <div className="flex gap-2 text-[10px]">
+      <div className="flex items-center justify-between gap-2 mb-2.5 px-0.5">
+        <div className="min-w-0">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+            Tables
+          </span>
+          <p className="text-[9px] text-muted-foreground/70 tabular-nums mt-0.5">
+            {visibleCount} of {erd.metadata.tables.length} visible
+          </p>
+        </div>
+        <div className="flex items-center gap-1 shrink-0">
           <button
             type="button"
-            className="text-electric hover:underline"
+            className="px-2 py-0.5 rounded-full text-[10px] font-medium border border-border/70 bg-surface-1/80 text-foreground hover:border-electric/40 hover:text-electric transition-colors"
             onClick={() => erd.toggleAllTables(true)}
           >
             All
           </button>
           <button
             type="button"
-            className="text-muted-foreground hover:underline"
+            className="px-2 py-0.5 rounded-full text-[10px] font-medium border border-border/70 bg-surface-1/40 text-muted-foreground hover:border-border hover:text-foreground transition-colors"
             onClick={() => erd.toggleAllTables(false)}
           >
             None
@@ -461,26 +471,56 @@ function ErdTableList({
         </div>
       </div>
       {erd.tablesBySchema.map(([schema, tables]) => (
-        <div key={schema} className="mb-2.5 last:mb-0">
-          <p className="text-[10px] font-mono text-muted-foreground px-1 mb-1.5">{schema}</p>
-          <ul className="space-y-1">
-            {tables.map((table) => (
-              <li key={table.id} className="flex items-center gap-2 px-1 py-0.5">
-                <Checkbox
-                  id={`erd-vis-${table.id}`}
-                  checked={!erd.hiddenTableIds.has(table.id)}
-                  onCheckedChange={(checked) =>
-                    erd.toggleTableVisibility(table.id, checked === true)
-                  }
-                />
-                <label
-                  htmlFor={`erd-vis-${table.id}`}
-                  className="text-[10px] font-mono truncate cursor-pointer"
-                >
-                  {table.name}
-                </label>
-              </li>
-            ))}
+        <div key={schema} className="mb-3 last:mb-0">
+          <div className="flex items-center gap-2 px-1 mb-1.5">
+            <span className="text-[9px] font-semibold uppercase tracking-[0.14em] text-muted-foreground/80">
+              {schema}
+            </span>
+            <div className="flex-1 h-px bg-border/50" aria-hidden />
+          </div>
+          <ul className="space-y-0.5">
+            {tables.map((table) => {
+              const visible = !erd.hiddenTableIds.has(table.id);
+              const inputId = `erd-vis-${table.id}`;
+
+              return (
+                <li key={table.id}>
+                  <label
+                    htmlFor={inputId}
+                    className={cn(
+                      "group flex items-center gap-2.5 rounded-md border px-2 py-1.5 cursor-pointer transition-all",
+                      visible
+                        ? "border-border/50 bg-surface-1/50 hover:border-electric/30 hover:bg-surface-1"
+                        : "border-transparent bg-transparent opacity-55 hover:opacity-80 hover:bg-surface-1/40",
+                    )}
+                  >
+                    <Checkbox
+                      id={inputId}
+                      checked={visible}
+                      onCheckedChange={(checked) =>
+                        erd.toggleTableVisibility(table.id, checked === true)
+                      }
+                      className="h-3.5 w-3.5 rounded-[4px] border-border/80 bg-background shadow-none data-[state=checked]:border-electric/50 data-[state=checked]:bg-electric data-[state=checked]:text-primary-foreground [&_svg]:size-2.5"
+                    />
+                    <Table2
+                      className={cn(
+                        "size-3 shrink-0 transition-colors",
+                        visible ? "text-electric/80" : "text-muted-foreground/50",
+                      )}
+                      aria-hidden
+                    />
+                    <span
+                      className={cn(
+                        "min-w-0 flex-1 truncate text-[11px] font-mono transition-colors",
+                        visible ? "text-foreground" : "text-muted-foreground",
+                      )}
+                    >
+                      {table.name}
+                    </span>
+                  </label>
+                </li>
+              );
+            })}
           </ul>
         </div>
       ))}
