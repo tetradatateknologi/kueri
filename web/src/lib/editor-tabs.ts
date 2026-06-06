@@ -108,49 +108,52 @@ export function buildOpenedTabs(
   drafts: Record<number, string>,
   tempTabs: Record<string, TempScriptTab>,
 ): EditorTab[] {
-  return openTabIds
-    .map((tabId) => {
-      if (isTempTabId(tabId)) {
-        const temp = tempTabs[tabId];
-        if (!temp) return null;
+  const tabs: EditorTab[] = [];
 
-        return {
-          tabId,
-          scriptId: null,
-          tempId: temp.tempId,
-          scriptName: temp.title,
-          projectId: temp.workspaceId,
-          projectName: temp.workspaceName,
-          workspaceId: temp.workspaceId,
-          workspaceName: temp.workspaceName,
-          isPersisted: false,
-          isDirty: isTempTabDirty(temp),
-        };
-      }
+  for (const tabId of openTabIds) {
+    if (isTempTabId(tabId)) {
+      const temp = tempTabs[tabId];
+      if (!temp) continue;
 
-      const scriptId = scriptIdFromTabId(tabId);
-      if (scriptId == null) return null;
-
-      const script = scripts.find((s) => s.id === scriptId);
-      if (!script) return null;
-
-      const workspace = workspaces.find((w) => w.id === script.workspace_id);
-      const projectName = workspace?.name ?? "Unknown project";
-
-      return {
+      tabs.push({
         tabId,
-        scriptId: script.id,
-        tempId: null,
-        scriptName: script.title,
-        projectId: script.workspace_id,
-        projectName,
-        workspaceId: script.workspace_id,
-        workspaceName: projectName,
-        isPersisted: true,
-        isDirty: isScriptDirty(script.id, drafts, scripts),
-      };
-    })
-    .filter((tab): tab is EditorTab => tab != null);
+        scriptId: null,
+        tempId: temp.tempId,
+        scriptName: temp.title,
+        projectId: temp.workspaceId,
+        projectName: temp.workspaceName,
+        workspaceId: temp.workspaceId,
+        workspaceName: temp.workspaceName,
+        isPersisted: false,
+        isDirty: isTempTabDirty(temp),
+      });
+      continue;
+    }
+
+    const scriptId = scriptIdFromTabId(tabId);
+    if (scriptId == null) continue;
+
+    const script = scripts.find((s) => s.id === scriptId);
+    if (!script) continue;
+
+    const workspace = workspaces.find((w) => w.id === script.workspace_id);
+    const projectName = workspace?.name ?? "Unknown project";
+
+    tabs.push({
+      tabId,
+      scriptId: script.id,
+      tempId: null,
+      scriptName: script.title,
+      projectId: script.workspace_id,
+      projectName,
+      workspaceId: script.workspace_id,
+      workspaceName: projectName,
+      isPersisted: true,
+      isDirty: isScriptDirty(script.id, drafts, scripts),
+    });
+  }
+
+  return tabs;
 }
 
 export function resolveNextActiveTabId(openTabIds: string[], closedId: string): string | null {
