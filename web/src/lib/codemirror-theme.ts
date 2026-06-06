@@ -7,6 +7,29 @@ const editorLayoutTheme = EditorView.theme({
   "&": { height: "100%", fontSize: "13px" },
   ".cm-scroller": { fontFamily: "var(--font-mono)" },
   ".cm-content": { padding: "12px 0" },
+  ".cm-tooltip.cm-tooltip-autocomplete": {
+    backgroundColor: "var(--popover)",
+    color: "var(--popover-foreground)",
+    border: "1px solid var(--border)",
+    borderRadius: "6px",
+  },
+  ".cm-tooltip.cm-tooltip-autocomplete > ul": {
+    fontFamily: "var(--font-mono)",
+    fontSize: "12px",
+  },
+  ".cm-tooltip.cm-tooltip-autocomplete > ul > li[aria-selected]": {
+    backgroundColor: "color-mix(in oklab, var(--electric) 18%, transparent)",
+    color: "var(--foreground)",
+  },
+  ".cm-completionDetail": {
+    color: "var(--muted-foreground)",
+    fontStyle: "normal",
+  },
+  ".cm-completionInfo": {
+    backgroundColor: "var(--popover)",
+    color: "var(--popover-foreground)",
+    border: "1px solid var(--border)",
+  },
 });
 
 const lightEditorTheme = EditorView.theme(

@@ -4,16 +4,8 @@ import { EditorEmptyState } from "@/components/kueri/EditorEmptyState";
 import { EditorPane } from "@/components/kueri/EditorPane";
 import { JsonResultsView } from "@/components/kueri/JsonResultsView";
 import { ResultsGrid } from "@/components/kueri/ResultsGrid";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { QueryResult, ResultColumnFilter, Script } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import type { ResultsView } from "@/stores/workspace-store";
@@ -24,8 +16,10 @@ type EditorResultsStackProps = {
   draftSql: string;
   setDraftSql: (sql: string) => void;
   runQuery: () => void;
+  activeTabId: string | null;
   activeScriptId: number | null;
   openEditScript: (id: number) => void;
+  openEditTempTab: (tabId: string) => void;
   favoriteScripts: Script[];
   createNewScript: () => void | Promise<void>;
   openScript: (id: number) => void;
@@ -40,6 +34,7 @@ type EditorResultsStackProps = {
   onFiltersChange?: (filters: ResultColumnFilter[]) => void;
   onClearAllFilters?: () => void;
   setExportOpen: (open: boolean) => void;
+  connectionId?: number | null;
 };
 
 export function EditorResultsStack({
@@ -48,8 +43,10 @@ export function EditorResultsStack({
   draftSql,
   setDraftSql,
   runQuery,
+  activeTabId,
   activeScriptId,
   openEditScript,
+  openEditTempTab,
   favoriteScripts,
   createNewScript,
   openScript,
@@ -64,6 +61,7 @@ export function EditorResultsStack({
   onFiltersChange,
   onClearAllFilters,
   setExportOpen,
+  connectionId = null,
 }: EditorResultsStackProps) {
   return (
     <ResizablePanelGroup
@@ -78,8 +76,13 @@ export function EditorResultsStack({
             value={draftSql}
             onChange={setDraftSql}
             onRun={runQuery}
+            connectionId={connectionId}
             onEditScript={() => {
-              if (activeScriptId != null) openEditScript(activeScriptId);
+              if (activeScriptId != null) {
+                openEditScript(activeScriptId);
+              } else if (activeTabId != null) {
+                openEditTempTab(activeTabId);
+              }
             }}
           />
         ) : (
