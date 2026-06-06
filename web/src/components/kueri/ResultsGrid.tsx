@@ -1,9 +1,10 @@
-import { useMemo, useState } from "react";
-import { ArrowUpDown, Database } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ArrowUpDown, Database, Info, Loader2 } from "lucide-react";
 
 import { WorkspaceEmptyState } from "@/components/kueri/WorkspaceEmptyState";
 import { ResultsTableSkeleton } from "@/components/kueri/ResultsTableSkeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { DEFAULT_QUERY_LIMIT } from "@/lib/api/query-config";
 import { cn } from "@/lib/utils";
 import type { QueryResult } from "@/lib/api/types";
 
@@ -13,6 +14,7 @@ type ResultsGridProps = {
   result: QueryResult | null;
   isLoading: boolean;
   error: string | null;
+  onLoadMore?: () => void;
 };
 
 const statusColor: Record<string, string> = {
@@ -22,9 +24,13 @@ const statusColor: Record<string, string> = {
   failed: "text-destructive bg-destructive/10 border-destructive/30",
 };
 
-export function ResultsGrid({ result, isLoading, error }: ResultsGridProps) {
+const SCROLL_LOAD_THRESHOLD_PX = 120;
+
+export function ResultsGrid({ result, isLoading, error, onLoadMore }: ResultsGridProps) {
   const [sortCol, setSortCol] = useState<string | null>(null);
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const loadMoreLockRef = useRef(false);
 
   const sortedRows = useMemo(() => {
     if (!result || sortCol == null) return result?.rows ?? [];
@@ -40,6 +46,35 @@ export function ResultsGrid({ result, isLoading, error }: ResultsGridProps) {
       return sortDir === "asc" ? cmp : -cmp;
     });
   }, [result, sortCol, sortDir]);
+
+  const tryLoadMore = useCallback(() => {
+    if (!result?.hasMore || result.loadingMore || !onLoadMore || loadMoreLockRef.current) {
+      return;
+    }
+    loadMoreLockRef.current = true;
+    onLoadMore();
+  }, [onLoadMore, result?.hasMore, result?.loadingMore]);
+
+  useEffect(() => {
+    if (!result?.loadingMore) {
+      loadMoreLockRef.current = false;
+    }
+  }, [result?.loadingMore]);
+
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || !onLoadMore) return;
+
+    const onScroll = () => {
+      const remaining = el.scrollHeight - el.scrollTop - el.clientHeight;
+      if (remaining <= SCROLL_LOAD_THRESHOLD_PX) {
+        tryLoadMore();
+      }
+    };
+
+    el.addEventListener("scroll", onScroll, { passive: true });
+    return () => el.removeEventListener("scroll", onScroll);
+  }, [onLoadMore, tryLoadMore]);
 
   if (isLoading) {
     return <ResultsTableSkeleton />;
@@ -74,8 +109,23 @@ export function ResultsGrid({ result, isLoading, error }: ResultsGridProps) {
     }
   };
 
+  const loadedCount = result.rows.length;
+  const limitHint = result.autoLimitApplied
+    ? `Limited to ${DEFAULT_QUERY_LIMIT} rows by default. Scroll to load more.`
+    : result.hasMore
+      ? "Using query-defined limit. Scroll to load more."
+      : hasExplicitLimitHint(result)
+        ? "Using query-defined limit."
+        : null;
+
   return (
-    <div className="h-full overflow-auto flex flex-col">
+    <div ref={scrollRef} className="h-full overflow-auto flex flex-col">
+      {limitHint && (
+        <div className="shrink-0 px-3 py-1.5 text-[10px] text-muted-foreground border-b border-border bg-surface-1/30 flex items-center gap-1.5">
+          <Info className="size-3 shrink-0 opacity-70" />
+          <span>{limitHint}</span>
+        </div>
+      )}
       <table className="w-full text-xs font-mono">
         <thead className="sticky top-0 bg-surface-1 border-b border-border z-10">
           <tr>
@@ -123,10 +173,25 @@ export function ResultsGrid({ result, isLoading, error }: ResultsGridProps) {
           ))}
         </tbody>
       </table>
-      <div className="px-3 py-2 text-[10px] text-muted-foreground font-mono border-t border-border bg-surface-1/40 mt-auto">
-        {result.rowCount} rows • {result.durationMs} ms
-        {result.cached ? " • cached" : ""}
+      <div className="px-3 py-2 text-[10px] text-muted-foreground font-mono border-t border-border bg-surface-1/40 mt-auto flex items-center gap-2">
+        <span>
+          {loadedCount} rows loaded • {result.durationMs} ms
+          {result.cached ? " • cached" : ""}
+        </span>
+        {result.loadingMore && (
+          <span className="inline-flex items-center gap-1 text-electric">
+            <Loader2 className="size-3 animate-spin" />
+            Loading more…
+          </span>
+        )}
+        {!result.hasMore && loadedCount > 0 && !result.loadingMore && (
+          <span className="text-muted-foreground/80">All rows loaded</span>
+        )}
       </div>
     </div>
   );
+}
+
+function hasExplicitLimitHint(result: QueryResult): boolean {
+  return !result.autoLimitApplied && result.limit > 0;
 }

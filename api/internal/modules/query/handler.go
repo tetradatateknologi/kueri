@@ -42,7 +42,16 @@ func (h *Handler) Execute(c echo.Context) error {
 		return apphttp.BadRequest(c, "connection_id is required")
 	}
 
-	result, err := h.exec.Execute(c.Request().Context(), user.ID, req.ConnectionID, sql)
+	limit := DefaultQueryLimit
+	if req.Limit != nil && *req.Limit > 0 {
+		limit = *req.Limit
+	}
+	offset := 0
+	if req.Offset != nil && *req.Offset >= 0 {
+		offset = *req.Offset
+	}
+
+	result, err := h.exec.Execute(c.Request().Context(), user.ID, req.ConnectionID, sql, limit, offset)
 	if err != nil {
 		if errors.Is(err, ErrConnectionNotFound) {
 			return apphttp.NotFound(c, "Connection not found")

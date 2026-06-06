@@ -55,6 +55,11 @@ export type QueryResult = {
   rowCount: number;
   durationMs: number;
   cached: boolean;
+  limit: number;
+  offset: number;
+  hasMore: boolean;
+  autoLimitApplied: boolean;
+  loadingMore?: boolean;
 };
 
 export type ConnectionDriver = "postgres" | "mysql";
@@ -74,6 +79,8 @@ export type ConnectionInput = {
 export type ExecuteQueryInput = {
   sql: string;
   connection_id: number;
+  limit?: number;
+  offset?: number;
 };
 
 export type HealthResponse = { status: string };

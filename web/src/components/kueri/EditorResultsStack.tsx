@@ -36,6 +36,7 @@ type EditorResultsStackProps = {
   lastResult: QueryResult | null;
   executeMutationIsPending: boolean;
   lastQueryError: string | null;
+  onLoadMore?: () => void;
   setExportOpen: (open: boolean) => void;
 };
 
@@ -56,6 +57,7 @@ export function EditorResultsStack({
   lastResult,
   executeMutationIsPending,
   lastQueryError,
+  onLoadMore,
   setExportOpen,
 }: EditorResultsStackProps) {
   return (
@@ -155,6 +157,7 @@ export function EditorResultsStack({
                 result={lastResult}
                 isLoading={executeMutationIsPending}
                 error={lastQueryError}
+                onLoadMore={onLoadMore}
               />
             ) : (
               <JsonResultsView result={lastResult} />
