@@ -38,6 +38,7 @@ type EditorResultsStackProps = {
   lastQueryError: string | null;
   onLoadMore?: () => void;
   setExportOpen: (open: boolean) => void;
+  connectionId?: number | null;
 };
 
 export function EditorResultsStack({
@@ -59,6 +60,7 @@ export function EditorResultsStack({
   lastQueryError,
   onLoadMore,
   setExportOpen,
+  connectionId = null,
 }: EditorResultsStackProps) {
   return (
     <ResizablePanelGroup
@@ -73,6 +75,7 @@ export function EditorResultsStack({
             value={draftSql}
             onChange={setDraftSql}
             onRun={runQuery}
+            connectionId={connectionId}
             onEditScript={() => {
               if (activeScriptId != null) openEditScript(activeScriptId);
             }}

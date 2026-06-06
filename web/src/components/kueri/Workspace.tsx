@@ -548,6 +548,7 @@ export function Workspace() {
                 lastQueryError={lastQueryError}
                 onLoadMore={loadMoreRows}
                 setExportOpen={setExportOpen}
+                connectionId={selectedConnection?.connectionId ?? null}
               />
             </ResizablePanel>
           </ResizablePanelGroup>
@@ -567,6 +568,7 @@ export function Workspace() {
             setResultsView={setResultsView}
             metaLabel={metaLabel}
             lastResult={lastResult}
+            connectionId={selectedConnection?.connectionId ?? null}
             executeMutationIsPending={executeMutation.isPending}
             lastQueryError={lastQueryError}
             onLoadMore={loadMoreRows}

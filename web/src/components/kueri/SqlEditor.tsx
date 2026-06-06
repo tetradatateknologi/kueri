@@ -1,4 +1,4 @@
-import { sql } from "@codemirror/lang-sql";
+import { sql, PostgreSQL, MySQL } from "@codemirror/lang-sql";
 import {
   defaultKeymap,
   history,
@@ -12,6 +12,12 @@ import { useEffect, useRef } from "react";
 
 import { useTheme } from "@/context/theme";
 import { getEditorThemeExtensions } from "@/lib/codemirror-theme";
+import {
+  createSqlCompletionExtension,
+  getSqlDialect,
+  sqlCompletionCompartment,
+  useSqlCompletionSchema,
+} from "@/lib/sql-completion";
 import { cn } from "@/lib/utils";
 
 type SqlEditorProps = {
@@ -20,8 +26,19 @@ type SqlEditorProps = {
   onRun?: () => void;
   onEditScript?: () => void;
   readOnly?: boolean;
+  connectionId?: number | null;
   className?: string;
 };
+
+function getSqlLanguage(driver: string | undefined) {
+  switch (getSqlDialect(driver)) {
+    case "mysql":
+      return sql({ dialect: MySQL });
+    case "postgres":
+    default:
+      return sql({ dialect: PostgreSQL });
+  }
+}
 
 export function SqlEditor({
   value,
@@ -29,12 +46,16 @@ export function SqlEditor({
   onRun,
   onEditScript,
   readOnly = false,
+  connectionId = null,
   className,
 }: SqlEditorProps) {
   const { resolvedTheme } = useTheme();
+  const completionSchema = useSqlCompletionSchema(connectionId, value);
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const themeCompartmentRef = useRef(new Compartment());
+  const completionSchemaRef = useRef(completionSchema);
+  completionSchemaRef.current = completionSchema;
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
   const onRunRef = useRef(onRun);
@@ -77,7 +98,8 @@ export function SqlEditor({
       extensions: [
         lineNumbers(),
         history(),
-        sql(),
+        getSqlLanguage(completionSchemaRef.current?.databaseType),
+        createSqlCompletionExtension(() => completionSchemaRef.current),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
         themeCompartmentRef.current.of(getEditorThemeExtensions(resolvedTheme)),
         Prec.high(runKeymap),
@@ -105,6 +127,16 @@ export function SqlEditor({
       effects: themeCompartmentRef.current.reconfigure(getEditorThemeExtensions(resolvedTheme)),
     });
   }, [resolvedTheme]);
+
+  useEffect(() => {
+    const view = viewRef.current;
+    if (!view) return;
+    view.dispatch({
+      effects: sqlCompletionCompartment.reconfigure(
+        createSqlCompletionExtension(() => completionSchemaRef.current),
+      ),
+    });
+  }, [completionSchema]);
 
   useEffect(() => {
     const view = viewRef.current;
