@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Columns3,
   Eye,
+  GitBranch,
   KeyRound,
   Loader2,
   RefreshCw,
@@ -11,9 +12,12 @@ import {
   Table2,
 } from "lucide-react";
 
+import { SchemaErdPanel } from "@/components/kueri/SchemaErdPanel";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { fetchConnectionSchema, fetchTableColumns } from "@/lib/api/schema";
 import { cn } from "@/lib/utils";
+
+type SchemaPanelView = "tree" | "erd";
 
 type SchemaExplorerPanelProps = {
   connectionId: number | null;
@@ -86,8 +90,13 @@ function TableColumns({ connectionId, schema, table, open }: TableColumnsProps) 
   );
 }
 
-export function SchemaExplorerPanel({ connectionId, connectionLabel }: SchemaExplorerPanelProps) {
-  const queryClient = useQueryClient();
+function SchemaTreeView({
+  connectionId,
+  connectionLabel,
+}: {
+  connectionId: number | null;
+  connectionLabel?: string;
+}) {
   const [search, setSearch] = useState("");
   const [openSchemas, setOpenSchemas] = useState<Record<string, boolean>>({});
   const [openTables, setOpenTables] = useState<Record<string, boolean>>({});
@@ -122,30 +131,8 @@ export function SchemaExplorerPanel({ connectionId, connectionLabel }: SchemaExp
       .filter((s): s is NonNullable<typeof s> => s != null);
   }, [schemaQuery.data?.schemas, search]);
 
-  const handleRefresh = () => {
-    if (connectionId == null) return;
-    void queryClient.invalidateQueries({ queryKey: ["connection-schema", connectionId] });
-    void queryClient.invalidateQueries({ queryKey: ["schema-columns", connectionId] });
-  };
-
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-border bg-surface-1/20">
-      <div className="h-10 shrink-0 flex items-center gap-2 border-b border-border px-3 bg-surface-1/40">
-        <Table2 className="size-3.5 text-electric shrink-0" aria-hidden />
-        <span className="text-xs font-semibold truncate">Schema</span>
-        <span className="sr-only">Read-only database structure</span>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          disabled={connectionId == null || schemaQuery.isFetching}
-          className="ml-auto p-1 rounded text-muted-foreground hover:text-foreground hover:bg-surface-1 disabled:opacity-40"
-          aria-label="Refresh schema"
-          title="Refresh schema"
-        >
-          <RefreshCw className={cn("size-3.5", schemaQuery.isFetching && "animate-spin")} />
-        </button>
-      </div>
-
+    <>
       {connectionLabel && (
         <p className="shrink-0 px-3 py-1.5 text-[10px] text-muted-foreground font-mono truncate border-b border-border/60">
           {connectionLabel}
@@ -264,6 +251,88 @@ export function SchemaExplorerPanel({ connectionId, connectionLabel }: SchemaExp
       <p className="shrink-0 px-3 py-2 text-[10px] text-muted-foreground border-t border-border/60">
         Read-only · expand a table to see columns
       </p>
+    </>
+  );
+}
+
+export function SchemaExplorerPanel({ connectionId, connectionLabel }: SchemaExplorerPanelProps) {
+  const queryClient = useQueryClient();
+  const [panelView, setPanelView] = useState<SchemaPanelView>("tree");
+
+  useEffect(() => {
+    setPanelView("tree");
+  }, [connectionId]);
+
+  const handleRefresh = () => {
+    if (connectionId == null) return;
+    if (panelView === "tree") {
+      void queryClient.invalidateQueries({ queryKey: ["connection-schema", connectionId] });
+      void queryClient.invalidateQueries({ queryKey: ["schema-columns", connectionId] });
+    } else {
+      void queryClient.invalidateQueries({ queryKey: ["connection-erd", connectionId] });
+    }
+  };
+
+  const isFetching =
+    panelView === "erd"
+      ? queryClient.isFetching({ queryKey: ["connection-erd", connectionId] }) > 0
+      : queryClient.isFetching({ queryKey: ["connection-schema", connectionId] }) > 0;
+
+  return (
+    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-r border-border bg-surface-1/20">
+      <div className="h-10 shrink-0 flex items-center gap-2 border-b border-border px-3 bg-surface-1/40">
+        <Table2 className="size-3.5 text-electric shrink-0" aria-hidden />
+        <span className="text-xs font-semibold truncate">Schema</span>
+        <div className="flex items-center gap-1 ml-1" role="tablist" aria-label="Schema panel view">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelView === "tree"}
+            onClick={() => setPanelView("tree")}
+            className={cn(
+              "px-2 h-6 text-[10px] rounded-md transition-colors",
+              panelView === "tree"
+                ? "bg-surface-1 border border-electric/40 text-electric font-medium"
+                : "text-muted-foreground hover:bg-surface-1",
+            )}
+          >
+            Tree
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={panelView === "erd"}
+            onClick={() => setPanelView("erd")}
+            className={cn(
+              "px-2 h-6 text-[10px] rounded-md transition-colors inline-flex items-center gap-1",
+              panelView === "erd"
+                ? "bg-surface-1 border border-electric/40 text-electric font-medium"
+                : "text-muted-foreground hover:bg-surface-1",
+            )}
+          >
+            <GitBranch className="size-3" aria-hidden />
+            ERD
+          </button>
+        </div>
+        <button
+          type="button"
+          onClick={handleRefresh}
+          disabled={connectionId == null || isFetching}
+          className="ml-auto p-1 rounded text-muted-foreground hover:text-foreground hover:bg-surface-1 disabled:opacity-40"
+          aria-label="Refresh schema"
+          title="Refresh"
+        >
+          <RefreshCw className={cn("size-3.5", isFetching && "animate-spin")} />
+        </button>
+      </div>
+
+      <div className="flex flex-1 min-h-0 flex-col overflow-hidden">
+        {panelView === "tree" ? (
+          <SchemaTreeView connectionId={connectionId} connectionLabel={connectionLabel} />
+        ) : (
+          <SchemaErdPanel connectionId={connectionId} connectionLabel={connectionLabel} />
+        )}
+      </div>
     </div>
   );
 }

@@ -51,6 +51,42 @@ func (s *Service) Overview(ctx context.Context, userID, connectionID int64) (Ove
 	}
 }
 
+func (s *Service) ERD(ctx context.Context, userID, connectionID int64) (ErdResponse, error) {
+	conn, password, err := s.loadConnection(ctx, userID, connectionID)
+	if err != nil {
+		return ErdResponse{}, err
+	}
+
+	execCtx, cancel := context.WithTimeout(ctx, schemaTimeout)
+	defer cancel()
+
+	var out ErdResponse
+	switch conn.Driver {
+	case sqlc.ConnectionDriverPostgres:
+		out, err = listPostgresERD(execCtx, conn, password)
+	case sqlc.ConnectionDriverMysql:
+		out, err = listMySQLErd(execCtx, conn, password)
+	default:
+		return ErdResponse{}, fmt.Errorf("unsupported driver: %s", conn.Driver)
+	}
+	if err != nil {
+		return ErdResponse{}, err
+	}
+
+	out.ConnectionID = connectionID
+	out.Driver = string(conn.Driver)
+	if out.Tables == nil {
+		out.Tables = []ErdTableNode{}
+	}
+	if out.Relations == nil {
+		out.Relations = []ErdRelation{}
+	}
+	if out.Schemas == nil {
+		out.Schemas = []string{}
+	}
+	return out, nil
+}
+
 func (s *Service) TableColumns(ctx context.Context, userID, connectionID int64, schemaName, tableName string) (ColumnsResponse, error) {
 	conn, password, err := s.loadConnection(ctx, userID, connectionID)
 	if err != nil {

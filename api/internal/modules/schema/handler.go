@@ -68,3 +68,25 @@ func (h *Handler) TableColumns(c echo.Context) error {
 
 	return apphttp.Success(c, out)
 }
+
+func (h *Handler) ERD(c echo.Context) error {
+	user, ok := middleware.UserFromContext(c.Request().Context())
+	if !ok {
+		return apphttp.NotFound(c, "User not found")
+	}
+
+	connectionID, err := strconv.ParseInt(c.Param("connectionId"), 10, 64)
+	if err != nil || connectionID <= 0 {
+		return apphttp.BadRequest(c, "Invalid connection id")
+	}
+
+	out, err := h.svc.ERD(c.Request().Context(), user.ID, connectionID)
+	if err != nil {
+		if errors.Is(err, ErrConnectionNotFound) {
+			return apphttp.NotFound(c, "Connection not found")
+		}
+		return apphttp.QueryError(c, err.Error())
+	}
+
+	return apphttp.Success(c, out)
+}

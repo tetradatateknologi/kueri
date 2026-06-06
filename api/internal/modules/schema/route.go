@@ -18,4 +18,5 @@ func RegisterRoutes(g *echo.Group, pool *pgxpool.Pool, cfg *config.Config) {
 
 	g.GET("/connections/:connectionId/schema", h.Overview)
 	g.GET("/connections/:connectionId/schema/columns", h.TableColumns)
+	g.GET("/connections/:connectionId/erd", h.ERD)
 }
