@@ -12,13 +12,13 @@ import {
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Background,
-  MiniMap,
   ReactFlow,
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
   useReactFlow,
   type Node,
+  type NodeChange,
 } from "@xyflow/react";
 import {
   Expand,
@@ -135,8 +135,17 @@ function useErdCanvas(connectionId: number, fitViewRef: MutableRefObject<FitView
     });
   }, [metadata, visibleTables, showSchemaLabel, search, highlightedTableIds]);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState<Node<ErdTableNodeData>>([]);
+  const [nodes, setNodes, onNodesChangeInternal] = useNodesState<Node<ErdTableNodeData>>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState(graph.edges);
+
+  const onNodesChange = useCallback(
+    (changes: NodeChange<Node<ErdTableNodeData>>[]) => {
+      onNodesChangeInternal(
+        changes.filter((change) => change.type !== "position" && change.type !== "dimensions"),
+      );
+    },
+    [onNodesChangeInternal],
+  );
 
   const applyLayout = useCallback(
     (mode: "auto" | "grid" | "saved") => {
@@ -415,24 +424,24 @@ function ErdFilters({ erd, className }: { erd: ErdCanvasState; className?: strin
 
 function ErdTableList({
   erd,
+  variant = "compact",
   className,
-  maxHeightClass,
 }: {
   erd: ErdCanvasState;
+  variant?: "compact" | "expanded";
   className?: string;
-  maxHeightClass?: string;
 }) {
   if (!erd.metadata || erd.metadata.tables.length === 0) return null;
 
   return (
     <div
       className={cn(
-        "shrink-0 overflow-y-auto border-border/60 px-2 py-1.5",
-        maxHeightClass ?? "max-h-28 border-b",
+        "overflow-y-auto border-border/60 px-2 py-1.5",
+        variant === "compact" ? "shrink-0 max-h-28 border-b" : "flex-1 min-h-0",
         className,
       )}
     >
-      <div className="flex items-center justify-between mb-1">
+      <div className="flex items-center justify-between mb-2">
         <span className="text-[10px] font-medium text-muted-foreground">Tables</span>
         <div className="flex gap-2 text-[10px]">
           <button
@@ -452,11 +461,11 @@ function ErdTableList({
         </div>
       </div>
       {erd.tablesBySchema.map(([schema, tables]) => (
-        <div key={schema} className="mb-1">
-          <p className="text-[10px] font-mono text-muted-foreground px-1">{schema}</p>
-          <ul className="space-y-0.5">
+        <div key={schema} className="mb-2.5 last:mb-0">
+          <p className="text-[10px] font-mono text-muted-foreground px-1 mb-1.5">{schema}</p>
+          <ul className="space-y-1">
             {tables.map((table) => (
-              <li key={table.id} className="flex items-center gap-2 px-1">
+              <li key={table.id} className="flex items-center gap-2 px-1 py-0.5">
                 <Checkbox
                   id={`erd-vis-${table.id}`}
                   checked={!erd.hiddenTableIds.has(table.id)}
@@ -570,6 +579,8 @@ function ErdFlowCanvas({
             onEdgesChange={erd.onEdgesChange}
             nodeTypes={nodeTypes}
             onNodeClick={erd.onNodeClick}
+            nodesDraggable={false}
+            selectNodesOnDrag={false}
             onInit={(instance) => {
               void instance.fitView({ padding: syncViewport ? 0.1 : 0.2, duration: 0 });
               requestAnimationFrame(() => {
@@ -582,11 +593,6 @@ function ErdFlowCanvas({
             className="!absolute inset-0 !h-full !w-full bg-background"
           >
             <Background gap={16} size={1} color="oklch(0.28 0.012 250)" />
-            <MiniMap
-              nodeColor="oklch(0.35 0.1 240)"
-              maskColor="oklch(0.15 0.012 250 / 0.7)"
-              className="!bg-surface-1 !border-border"
-            />
           </ReactFlow>
           {erd.metadata.relations.length === 0 && erd.layoutReady && (
             <p className="absolute bottom-2 left-2 right-2 text-[10px] text-muted-foreground text-center pointer-events-none bg-surface-1/80 rounded px-2 py-1 border border-border/60">
@@ -643,11 +649,11 @@ function ErdPanelLayout({
         </button>
         <span className="text-xs text-muted-foreground">Filters & tables</span>
       </div>
-      <div className="flex flex-1 min-h-0 min-w-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 min-w-0 h-full overflow-hidden">
         {filtersOpen && (
-          <aside className="shrink-0 w-56 min-h-0 flex flex-col overflow-hidden border-r border-border/60 bg-surface-1/20">
-            <ErdFilters erd={erd} className="border-b border-border/60" />
-            <ErdTableList erd={erd} className="flex-1 min-h-0 border-b-0" />
+          <aside className="shrink-0 w-56 h-full min-h-0 flex flex-col overflow-hidden border-r border-border/60 bg-surface-1/20">
+            <ErdFilters erd={erd} className="shrink-0 border-b border-border/60" />
+            <ErdTableList erd={erd} variant="expanded" />
           </aside>
         )}
         <div className="flex flex-1 min-h-0 min-w-0 h-full flex-col overflow-hidden">

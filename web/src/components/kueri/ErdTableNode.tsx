@@ -18,7 +18,7 @@ export const ErdTableNode = memo(function ErdTableNode({
   return (
     <div
       className={cn(
-        "rounded-md border bg-surface-1 shadow-sm text-[11px] font-mono overflow-hidden",
+        "nodrag rounded-md border bg-surface-1 shadow-sm text-[11px] font-mono overflow-hidden",
         selected || highlighted
           ? "border-electric/70 ring-1 ring-electric/30"
           : "border-border",

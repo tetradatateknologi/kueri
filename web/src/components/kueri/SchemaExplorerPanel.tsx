@@ -6,6 +6,7 @@ import {
   Eye,
   GitBranch,
   KeyRound,
+  ListTree,
   Loader2,
   RefreshCw,
   Search,
@@ -290,12 +291,13 @@ export function SchemaExplorerPanel({ connectionId, connectionLabel }: SchemaExp
             aria-selected={panelView === "tree"}
             onClick={() => setPanelView("tree")}
             className={cn(
-              "px-2 h-6 text-[10px] rounded-md transition-colors",
+              "px-2 h-6 text-[10px] rounded-md transition-colors inline-flex items-center gap-1",
               panelView === "tree"
                 ? "bg-surface-1 border border-electric/40 text-electric font-medium"
                 : "text-muted-foreground hover:bg-surface-1",
             )}
           >
+            <ListTree className="size-3" aria-hidden />
             Tree
           </button>
           <button

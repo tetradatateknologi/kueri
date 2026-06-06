@@ -99,6 +99,7 @@ export function buildErdGraph(
     id: table.id,
     type: "erdTable",
     position: { x: 0, y: 0 },
+    draggable: false,
     data: {
       table,
       showSchemaLabel: options.showSchemaLabel,

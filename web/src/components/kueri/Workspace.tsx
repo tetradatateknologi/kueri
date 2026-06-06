@@ -511,7 +511,13 @@ export function Workspace() {
                   connectionId={selectedConnection?.connectionId ?? null}
                   connectionLabel={
                     selectedConnection
-                      ? `${selectedConnection.label} · ${selectedConnection.host}`
+                      ? [
+                          selectedConnection.projectName,
+                          selectedConnection.label,
+                          selectedConnection.host,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")
                       : undefined
                   }
                 />
