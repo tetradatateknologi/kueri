@@ -42,6 +42,16 @@ func (h *Handler) Execute(c echo.Context) error {
 		return apphttp.BadRequest(c, "connection_id is required")
 	}
 
+	if len(req.Filters) > 0 {
+		if err := validateFilters(req.Filters); err != nil {
+			return apphttp.BadRequest(c, err.Error())
+		}
+		eligibility := AnalyzeQueryFilterEligibility(sql, nil)
+		if !eligibility.Enabled {
+			return apphttp.BadRequest(c, eligibility.Reason)
+		}
+	}
+
 	limit := DefaultQueryLimit
 	if req.Limit != nil && *req.Limit > 0 {
 		limit = *req.Limit
@@ -51,10 +61,13 @@ func (h *Handler) Execute(c echo.Context) error {
 		offset = *req.Offset
 	}
 
-	result, err := h.exec.Execute(c.Request().Context(), user.ID, req.ConnectionID, sql, limit, offset)
+	result, err := h.exec.Execute(c.Request().Context(), user.ID, req.ConnectionID, sql, limit, offset, req.Filters)
 	if err != nil {
 		if errors.Is(err, ErrConnectionNotFound) {
 			return apphttp.NotFound(c, "Connection not found")
+		}
+		if errors.Is(err, ErrInvalidFilter) {
+			return apphttp.BadRequest(c, err.Error())
 		}
 		return apphttp.QueryError(c, err.Error())
 	}

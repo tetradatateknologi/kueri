@@ -5,7 +5,7 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 
 function makeResult(rows: unknown[][]): QueryResult {
   return {
-    columns: ["id"],
+    columns: [{ name: "id", filterable: true }],
     rows,
     rowCount: rows.length,
     durationMs: 10,
@@ -14,6 +14,11 @@ function makeResult(rows: unknown[][]): QueryResult {
     offset: 0,
     hasMore: true,
     autoLimitApplied: true,
+    filtering: {
+      enabled: true,
+      mode: "server",
+      appliedFilters: [],
+    },
     loadingMore: false,
   };
 }

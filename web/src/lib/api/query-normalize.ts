@@ -2,7 +2,7 @@ import type { QueryResult, QueryRunResult } from "./types";
 
 export function normalizeRunResult(result: QueryRunResult, cached = false): QueryResult {
   return {
-    columns: result.columns,
+    columns: result.columns.map((name) => ({ name, filterable: false })),
     rows: result.rows.map((row) => result.columns.map((col) => row[col])),
     rowCount: result.row_count,
     durationMs: result.duration_ms,
@@ -11,5 +11,11 @@ export function normalizeRunResult(result: QueryRunResult, cached = false): Quer
     offset: 0,
     hasMore: false,
     autoLimitApplied: false,
+    filtering: {
+      enabled: false,
+      mode: "none",
+      reason: null,
+      appliedFilters: [],
+    },
   };
 }

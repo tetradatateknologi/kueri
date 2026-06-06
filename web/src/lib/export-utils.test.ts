@@ -37,7 +37,10 @@ describe("inferTableName", () => {
 describe("resultToCsv", () => {
   it("escapes commas and quotes", () => {
     const result: QueryResult = {
-      columns: ["name", "note"],
+      columns: [
+        { name: "name", filterable: true },
+        { name: "note", filterable: true },
+      ],
       rows: [["Ava", 'said "hi"']],
       rowCount: 1,
       durationMs: 1,
@@ -46,6 +49,11 @@ describe("resultToCsv", () => {
       offset: 0,
       hasMore: false,
       autoLimitApplied: true,
+      filtering: {
+        enabled: true,
+        mode: "server",
+        appliedFilters: [],
+      },
     };
     expect(resultToCsv(result)).toBe('name,note\nAva,"said ""hi"""');
   });

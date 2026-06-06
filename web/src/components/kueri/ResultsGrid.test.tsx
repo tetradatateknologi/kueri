@@ -6,7 +6,7 @@ import type { QueryResult } from "@/lib/api/types";
 
 function makeResult(overrides: Partial<QueryResult> = {}): QueryResult {
   return {
-    columns: ["id"],
+    columns: [{ name: "id", filterable: true }],
     rows: Array.from({ length: 20 }, (_, i) => [i + 1]),
     rowCount: 20,
     durationMs: 12,
@@ -15,6 +15,11 @@ function makeResult(overrides: Partial<QueryResult> = {}): QueryResult {
     offset: 0,
     hasMore: true,
     autoLimitApplied: true,
+    filtering: {
+      enabled: true,
+      mode: "server",
+      appliedFilters: [],
+    },
     loadingMore: false,
     ...overrides,
   };

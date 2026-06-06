@@ -49,8 +49,29 @@ export type QueryRunResult = {
   rows: Record<string, unknown>[];
 };
 
+export type FilterOperator = "contains" | "equals" | "is_null" | "is_not_null";
+
+export type ResultColumnFilter = {
+  column: string;
+  operator: FilterOperator;
+  value?: string;
+};
+
+export type QueryResultColumn = {
+  name: string;
+  dataType?: string;
+  filterable: boolean;
+};
+
+export type QueryFilteringInfo = {
+  enabled: boolean;
+  mode: "server" | "client" | "none";
+  reason?: string | null;
+  appliedFilters?: ResultColumnFilter[];
+};
+
 export type QueryResult = {
-  columns: string[];
+  columns: QueryResultColumn[];
   rows: unknown[][];
   rowCount: number;
   durationMs: number;
@@ -59,8 +80,14 @@ export type QueryResult = {
   offset: number;
   hasMore: boolean;
   autoLimitApplied: boolean;
+  filtering: QueryFilteringInfo;
   loadingMore?: boolean;
+  loadingFilter?: boolean;
 };
+
+export function queryResultColumnNames(columns: QueryResultColumn[]): string[] {
+  return columns.map((c) => c.name);
+}
 
 export type ConnectionDriver = "postgres" | "mysql";
 
@@ -81,6 +108,7 @@ export type ExecuteQueryInput = {
   connection_id: number;
   limit?: number;
   offset?: number;
+  filters?: ResultColumnFilter[];
 };
 
 export type HealthResponse = { status: string };

@@ -6,8 +6,7 @@ import { JsonResultsView } from "@/components/kueri/JsonResultsView";
 import { ResultsGrid } from "@/components/kueri/ResultsGrid";
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import type { Script } from "@/lib/api/types";
-import type { QueryResult } from "@/lib/api/types";
+import type { QueryResult, ResultColumnFilter, Script } from "@/lib/api/types";
 import { cn } from "@/lib/utils";
 import type { ResultsView } from "@/stores/workspace-store";
 
@@ -31,6 +30,9 @@ type EditorResultsStackProps = {
   executeMutationIsPending: boolean;
   lastQueryError: string | null;
   onLoadMore?: () => void;
+  activeFilters?: ResultColumnFilter[];
+  onFiltersChange?: (filters: ResultColumnFilter[]) => void;
+  onClearAllFilters?: () => void;
   setExportOpen: (open: boolean) => void;
   connectionId?: number | null;
 };
@@ -55,6 +57,9 @@ export function EditorResultsStack({
   executeMutationIsPending,
   lastQueryError,
   onLoadMore,
+  activeFilters,
+  onFiltersChange,
+  onClearAllFilters,
   setExportOpen,
   connectionId = null,
 }: EditorResultsStackProps) {
@@ -161,6 +166,9 @@ export function EditorResultsStack({
                 isLoading={executeMutationIsPending}
                 error={lastQueryError}
                 onLoadMore={onLoadMore}
+                activeFilters={activeFilters}
+                onFiltersChange={onFiltersChange}
+                onClearAllFilters={onClearAllFilters}
               />
             ) : (
               <JsonResultsView result={lastResult} />
