@@ -1,6 +1,5 @@
 import {
   AlertDialog,
-  AlertDialogAction,
   AlertDialogCancel,
   AlertDialogContent,
   AlertDialogDescription,
@@ -8,33 +7,51 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Button } from "@/components/ui/button";
 
 type UnsavedChangesDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onConfirm: () => void;
+  onDiscard: () => void;
+  onSave: () => void;
 };
 
-export function UnsavedChangesDialog({ open, onOpenChange, onConfirm }: UnsavedChangesDialogProps) {
+export function UnsavedChangesDialog({
+  open,
+  onOpenChange,
+  onDiscard,
+  onSave,
+}: UnsavedChangesDialogProps) {
   return (
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Discard unsaved changes?</AlertDialogTitle>
+          <AlertDialogTitle>Save changes to this script?</AlertDialogTitle>
           <AlertDialogDescription>
-            You have unsaved changes. Close without saving?
+            Your changes will be lost if you don&apos;t save them.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction
+          <Button
+            type="button"
+            variant="outline"
             onClick={(e) => {
               e.preventDefault();
-              onConfirm();
+              onDiscard();
             }}
           >
-            Close without saving
-          </AlertDialogAction>
+            Discard
+          </Button>
+          <Button
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              onSave();
+            }}
+          >
+            Save
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>

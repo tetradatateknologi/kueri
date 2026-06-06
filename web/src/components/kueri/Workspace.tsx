@@ -7,19 +7,10 @@ import { ExportModal } from "@/components/kueri/ExportModal";
 import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
 import { SchemaExplorerPanel } from "@/components/kueri/SchemaExplorerPanel";
 import { UnsavedChangesDialog } from "@/components/kueri/UnsavedChangesDialog";
-import {
-  ResizableHandle,
-  ResizablePanel,
-  ResizablePanelGroup,
-} from "@/components/ui/resizable";
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from "@/components/ui/resizable";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SidebarTrigger } from "@/components/ui/sidebar";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
 import { useKueriHotkeys } from "@/hooks/use-kueri-hotkeys";
@@ -27,8 +18,11 @@ import { formatShortcut } from "@/lib/hotkeys";
 import { ApiError, executeQuery } from "@/lib/api/http";
 import { DEFAULT_QUERY_LIMIT } from "@/lib/api/query-config";
 import { useExecuteQuery } from "@/lib/api/queries";
-import { formatEditorContextLabel } from "@/lib/editor-tabs";
-import { saveScript } from "@/lib/saved-scripts";
+import {
+  canCloseTabWithoutConfirm,
+  formatEditorContextLabel,
+  formatTabLabel,
+} from "@/lib/editor-tabs";
 import {
   showQueryErrorToast,
   showQueryResultToast,
@@ -43,20 +37,22 @@ export function Workspace() {
     workspaces,
     favoriteScripts,
     openedTabs,
+    activeTabId,
     activeScriptId,
     activeScript,
     activeTab,
     draftSql,
     setDraftSql,
     openScript,
-    closeScript,
-    isScriptDirty,
-    setActiveScriptId,
+    closeTab,
+    setActiveTabId,
     saveActiveScript,
+    saveTab,
     isSaving,
     isLoading,
     createNewScript,
     openEditScript,
+    openEditTempTab,
     openRenameScript,
     toggleFavorite,
   } = useKueriApp();
@@ -83,21 +79,26 @@ export function Workspace() {
   const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(true);
-  const [pendingCloseScriptId, setPendingCloseScriptId] = useState<number | null>(null);
+  const [pendingCloseTabId, setPendingCloseTabId] = useState<string | null>(null);
 
   const activeTitle = activeScript?.title ?? activeTab?.scriptName ?? "untitled.sql";
   const hasOpenTab = openedTabs.length > 0;
   const activeContextLabel = activeTab ? formatEditorContextLabel(activeTab) : null;
 
-  const requestCloseScript = useCallback(
-    (scriptId: number) => {
-      if (isScriptDirty(scriptId)) {
-        setPendingCloseScriptId(scriptId);
+  const requestCloseTab = useCallback(
+    (tabId: string) => {
+      const tab = openedTabs.find((t) => t.tabId === tabId);
+      if (!tab) return;
+
+      const content = tabId === activeTabId ? draftSql : "";
+      if (canCloseTabWithoutConfirm(tab, content) || !tab.isDirty) {
+        closeTab(tabId);
         return;
       }
-      closeScript(scriptId);
+
+      setPendingCloseTabId(tabId);
     },
-    [closeScript, isScriptDirty],
+    [closeTab, draftSql, activeTabId, openedTabs],
   );
 
   useEffect(() => {
@@ -142,7 +143,11 @@ export function Workspace() {
         },
         onError: (err) => {
           const message =
-            err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
+            err instanceof ApiError
+              ? err.message
+              : err instanceof Error
+                ? err.message
+                : "Query failed";
           setLastQueryError(message);
           showQueryErrorToast(message);
         },
@@ -182,7 +187,11 @@ export function Workspace() {
       .catch((err) => {
         setResultLoadingMore(false);
         const message =
-          err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Query failed";
         setLastQueryError(message);
         showQueryErrorToast(message);
       });
@@ -216,30 +225,39 @@ export function Workspace() {
   }, []);
 
   const handleSave = useCallback(async () => {
-    if (!hasOpenTab) return;
-    if (activeScriptId == null) {
-      saveScript({ title: activeTitle, sql: draftSql });
-      showSaveScriptToast({ local: true });
-      return;
-    }
-    try {
-      await saveActiveScript();
+    if (!hasOpenTab || activeTabId == null) return;
+    const saved = await saveActiveScript();
+    if (saved) {
       showSaveScriptToast({ title: activeTitle });
-    } catch (err) {
-      showQueryErrorToast(err instanceof Error ? err.message : "Save failed", "Save failed");
     }
-  }, [hasOpenTab, activeScriptId, activeTitle, draftSql, saveActiveScript]);
+  }, [hasOpenTab, activeTabId, activeTitle, saveActiveScript]);
+
+  const handleSaveAndClose = useCallback(async () => {
+    if (pendingCloseTabId == null) return;
+    const tabId = pendingCloseTabId;
+    const tab = openedTabs.find((t) => t.tabId === tabId);
+    setPendingCloseTabId(null);
+    const saved = await saveTab(tabId, { closeAfterSave: true });
+    if (saved && tab?.isPersisted) {
+      showSaveScriptToast({ title: tab.scriptName });
+    }
+  }, [openedTabs, pendingCloseTabId, saveTab]);
 
   const hotkeyHandlers = useMemo(
     () => ({
       onRun: runQuery,
       onSave: () => void handleSave(),
-      onNewTab: () => void createNewScript(),
+      onNewTab: () => createNewScript(),
       onCloseTab: () => {
-        if (activeScriptId != null) requestCloseScript(activeScriptId);
+        if (activeTabId != null) requestCloseTab(activeTabId);
       },
       onEditScript: () => {
-        if (activeScriptId != null) openEditScript(activeScriptId);
+        if (activeTabId == null) return;
+        if (activeScriptId != null) {
+          openEditScript(activeScriptId);
+        } else {
+          openEditTempTab(activeTabId);
+        }
       },
       onRenameScript: () => {
         if (activeScriptId != null) openRenameScript(activeScriptId);
@@ -254,35 +272,37 @@ export function Workspace() {
       onFocusSidebarSearch: focusSidebarSearch,
       onCycleConnection: cycleConnection,
       onNextTab: () => {
-        if (!openedTabs.length || activeScriptId == null) return;
-        const ids = openedTabs.map((tab) => tab.scriptId);
-        const i = ids.indexOf(activeScriptId);
+        if (!openedTabs.length || activeTabId == null) return;
+        const ids = openedTabs.map((tab) => tab.tabId);
+        const i = ids.indexOf(activeTabId);
         const nextId = ids[(i + 1) % ids.length];
-        setActiveScriptId(nextId);
+        setActiveTabId(nextId);
       },
       onPrevTab: () => {
-        if (!openedTabs.length || activeScriptId == null) return;
-        const ids = openedTabs.map((tab) => tab.scriptId);
-        const i = ids.indexOf(activeScriptId);
+        if (!openedTabs.length || activeTabId == null) return;
+        const ids = openedTabs.map((tab) => tab.tabId);
+        const i = ids.indexOf(activeTabId);
         const prevId = ids[(i - 1 + ids.length) % ids.length];
-        setActiveScriptId(prevId);
+        setActiveTabId(prevId);
       },
       onSwitchTab: (index: number) => {
-        const id = openedTabs[index]?.scriptId;
-        if (id != null) setActiveScriptId(id);
+        const id = openedTabs[index]?.tabId;
+        if (id != null) setActiveTabId(id);
       },
       onResultsView: (view: "results" | "json") => setResultsView(view),
     }),
     [
       runQuery,
+      activeTabId,
       activeScriptId,
-      requestCloseScript,
+      requestCloseTab,
       createNewScript,
       openEditScript,
+      openEditTempTab,
       openRenameScript,
       toggleFavorite,
       openedTabs,
-      setActiveScriptId,
+      setActiveTabId,
       lastResult,
       focusSidebarSearch,
       cycleConnection,
@@ -331,29 +351,37 @@ export function Workspace() {
           </Tooltip>
           <div className="flex items-end gap-px overflow-x-auto min-w-0 flex-1">
             {openedTabs.map((tab) => {
-              const isActive = tab.scriptId === activeScriptId;
+              const isActive = tab.tabId === activeTabId;
               const tabLabel = formatEditorContextLabel(tab);
               return (
                 <div
-                  key={tab.scriptId}
+                  key={tab.tabId}
                   role="tab"
                   aria-selected={isActive}
                   tabIndex={isActive ? 0 : -1}
                   title={tabLabel}
                   onClick={() => {
                     if (isActive) {
-                      openEditScript(tab.scriptId);
+                      if (tab.isPersisted && tab.scriptId != null) {
+                        openEditScript(tab.scriptId);
+                      } else {
+                        openEditTempTab(tab.tabId);
+                      }
                     } else {
-                      setActiveScriptId(tab.scriptId);
+                      setActiveTabId(tab.tabId);
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       if (isActive) {
-                        openEditScript(tab.scriptId);
+                        if (tab.isPersisted && tab.scriptId != null) {
+                          openEditScript(tab.scriptId);
+                        } else {
+                          openEditTempTab(tab.tabId);
+                        }
                       } else {
-                        setActiveScriptId(tab.scriptId);
+                        setActiveTabId(tab.tabId);
                       }
                     }
                   }}
@@ -364,20 +392,13 @@ export function Workspace() {
                       : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-surface-1/40",
                   )}
                 >
-                  <span className="font-mono truncate">
-                    {tab.isDirty ? (
-                      <span className="text-electric mr-1" aria-hidden>
-                        •
-                      </span>
-                    ) : null}
-                    {tab.scriptName}
-                  </span>
+                  <span className="font-mono truncate">{formatTabLabel(tab)}</span>
                   <button
                     type="button"
                     aria-label={`Close ${tab.scriptName}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      requestCloseScript(tab.scriptId);
+                      requestCloseTab(tab.tabId);
                     }}
                     className="size-4 rounded hover:bg-border flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
                   >
@@ -389,7 +410,7 @@ export function Workspace() {
             <button
               type="button"
               aria-label="New tab"
-              onClick={() => void createNewScript()}
+              onClick={() => createNewScript()}
               className="h-9 px-2 text-muted-foreground hover:text-electric transition-colors"
             >
               <Plus className="size-4" />
@@ -428,7 +449,11 @@ export function Workspace() {
               title={`Save (${formatShortcut("S")})`}
               className="flex items-center gap-1.5 px-2 h-8 rounded-md text-xs text-muted-foreground hover:text-foreground hover:bg-surface-1 transition-colors disabled:opacity-50 shrink-0 whitespace-nowrap"
             >
-              {isSaving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5 shrink-0" />}
+              {isSaving ? (
+                <Loader2 className="size-3.5 animate-spin" />
+              ) : (
+                <Save className="size-3.5 shrink-0" />
+              )}
               <span className="hidden md:inline">Save</span>
               <span className="hidden xl:inline text-[10px] opacity-60 font-mono">
                 {formatShortcut("S")}
@@ -535,8 +560,10 @@ export function Workspace() {
                 draftSql={draftSql}
                 setDraftSql={setDraftSql}
                 runQuery={runQuery}
+                activeTabId={activeTabId}
                 activeScriptId={activeScriptId}
                 openEditScript={openEditScript}
+                openEditTempTab={openEditTempTab}
                 favoriteScripts={favoriteScripts}
                 createNewScript={createNewScript}
                 openScript={openScript}
@@ -558,8 +585,10 @@ export function Workspace() {
             draftSql={draftSql}
             setDraftSql={setDraftSql}
             runQuery={runQuery}
+            activeTabId={activeTabId}
             activeScriptId={activeScriptId}
             openEditScript={openEditScript}
+            openEditTempTab={openEditTempTab}
             favoriteScripts={favoriteScripts}
             createNewScript={createNewScript}
             openScript={openScript}
@@ -586,16 +615,17 @@ export function Workspace() {
           onPickSql={setDraftSql}
         />
         <UnsavedChangesDialog
-          open={pendingCloseScriptId != null}
+          open={pendingCloseTabId != null}
           onOpenChange={(open) => {
-            if (!open) setPendingCloseScriptId(null);
+            if (!open) setPendingCloseTabId(null);
           }}
-          onConfirm={() => {
-            if (pendingCloseScriptId != null) {
-              closeScript(pendingCloseScriptId);
+          onDiscard={() => {
+            if (pendingCloseTabId != null) {
+              closeTab(pendingCloseTabId);
             }
-            setPendingCloseScriptId(null);
+            setPendingCloseTabId(null);
           }}
+          onSave={() => void handleSaveAndClose()}
         />
       </div>
     </TooltipProvider>

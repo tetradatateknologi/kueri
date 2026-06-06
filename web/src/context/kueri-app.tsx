@@ -9,19 +9,22 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import {
-  EditScriptDialog,
-  type EditScriptFormValues,
-} from "@/components/kueri/EditScriptDialog";
+import { EditScriptDialog, type EditScriptFormValues } from "@/components/kueri/EditScriptDialog";
 import { RenameDialog } from "@/components/kueri/RenameDialog";
+import { SaveScriptDialog } from "@/components/kueri/SaveScriptDialog";
 import { ApiError } from "@/lib/api/http";
 import { getMe } from "@/lib/api/me";
-import { createScript, getScript, listScripts, setScriptFavorite, updateScript } from "@/lib/api/scripts";
+import {
+  createScript,
+  getScript,
+  listScripts,
+  setScriptFavorite,
+  updateScript,
+} from "@/lib/api/scripts";
 import { getFavoriteScripts } from "@/lib/favorite-scripts";
-import { showSuccess, showValidationError } from "@/lib/toasts";
+import { showSaveScriptToast, showSuccess, showValidationError } from "@/lib/toasts";
 import type { Script, User, Workspace } from "@/lib/api/types";
 import {
-  generateNewScriptTitle,
   isReservedScriptTitle,
   stripScriptTitleExtension,
   toScriptTitle,
@@ -30,14 +33,22 @@ import { listWorkspaces } from "@/lib/api/workspaces";
 import { useAppUrl } from "@/context/app-url";
 import {
   buildOpenedTabs,
+  createTempScriptTab,
   isScriptDirty,
+  isTempTabDirty,
+  isTempTabId,
   resolveNextActiveTabId,
+  scriptIdFromTabId,
+  tabIdFromScriptId,
   type EditorTab,
+  type TempScriptTab,
 } from "@/lib/editor-tabs";
 import { useWorkspaceStore } from "@/stores/workspace-store";
 
 type EditScriptTarget = { id: number; title: string; tags: string[] };
 type RenameScriptTarget = { id: number; title: string; tags: string[] };
+type EditTempTabTarget = { tabId: string; title: string };
+type SaveScriptTarget = { tabId: string; title: string; workspaceId: number | null };
 
 type KueriAppContextValue = {
   me: User | undefined;
@@ -47,22 +58,26 @@ type KueriAppContextValue = {
   isLoading: boolean;
   isTogglingFavorite: boolean;
   error: Error | null;
-  openScriptIds: number[];
+  openTabIds: string[];
   openedTabs: EditorTab[];
+  activeTabId: string | null;
   activeScriptId: number | null;
   activeScript: Script | undefined;
   activeTab: EditorTab | undefined;
   draftSql: string;
   setDraftSql: (sql: string) => void;
   openScript: (id: number) => void;
-  closeScript: (id: number) => void;
+  closeTab: (tabId: string) => void;
+  isTabDirty: (tabId: string) => boolean;
   isScriptDirty: (id: number) => boolean;
-  setActiveScriptId: (id: number) => void;
-  saveActiveScript: () => Promise<void>;
+  setActiveTabId: (tabId: string) => void;
+  saveActiveScript: () => Promise<boolean>;
+  saveTab: (tabId: string, options?: { closeAfterSave?: boolean }) => Promise<boolean>;
   isSaving: boolean;
   refetchAll: () => void;
-  createNewScript: (workspaceId?: number) => Promise<void>;
+  createNewScript: (workspaceId?: number) => void;
   openEditScript: (id: number) => void;
+  openEditTempTab: (tabId: string) => void;
   openRenameScript: (id: number) => void;
   toggleFavorite: (id: number) => void;
 };
@@ -72,16 +87,27 @@ const KueriAppContext = createContext<KueriAppContextValue | null>(null);
 export function KueriAppProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
   const { setActiveScriptId: setUrlScriptId } = useAppUrl();
-  const [openScriptIds, setOpenScriptIds] = useState<number[]>([]);
-  const [activeScriptId, setActiveScriptId] = useState<number | null>(null);
+  const [openTabIds, setOpenTabIds] = useState<string[]>([]);
+  const [activeTabId, setActiveTabIdState] = useState<string | null>(null);
   const [draftSql, setDraftSqlState] = useState("");
   const draftByScriptIdRef = useRef<Record<number, string>>({});
+  const tempTabsRef = useRef<Record<string, TempScriptTab>>({});
+  const [tempTabsVersion, setTempTabsVersion] = useState(0);
+  const bumpTempTabs = useCallback(() => setTempTabsVersion((n) => n + 1), []);
   const [editScriptTarget, setEditScriptTarget] = useState<EditScriptTarget | null>(null);
+  const [editTempTabTarget, setEditTempTabTarget] = useState<EditTempTabTarget | null>(null);
   const [renameScriptTarget, setRenameScriptTarget] = useState<RenameScriptTarget | null>(null);
+  const [saveScriptTarget, setSaveScriptTarget] = useState<SaveScriptTarget | null>(null);
+  const closeAfterSaveTabIdRef = useRef<string | null>(null);
 
   const meQuery = useQuery({ queryKey: ["me"], queryFn: getMe });
   const workspacesQuery = useQuery({ queryKey: ["workspaces"], queryFn: listWorkspaces });
   const scriptsQuery = useQuery({ queryKey: ["scripts"], queryFn: listScripts });
+
+  const activeScriptId = useMemo(() => {
+    if (activeTabId == null) return null;
+    return scriptIdFromTabId(activeTabId);
+  }, [activeTabId]);
 
   const activeScriptQuery = useQuery({
     queryKey: ["script", activeScriptId],
@@ -93,18 +119,48 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     draftByScriptIdRef.current[scriptId] = sql;
   }, []);
 
+  const persistTempTabSql = useCallback(
+    (tabId: string, sql: string) => {
+      const temp = tempTabsRef.current[tabId];
+      if (!temp) return;
+      tempTabsRef.current[tabId] = {
+        ...temp,
+        sql,
+        isDirty: sql !== temp.lastSavedContent,
+      };
+      bumpTempTabs();
+    },
+    [bumpTempTabs],
+  );
+
   const setDraftSql = useCallback(
     (sql: string) => {
       setDraftSqlState(sql);
-      if (activeScriptId != null) {
-        persistDraftForScript(activeScriptId, sql);
+      if (activeTabId == null) return;
+      if (isTempTabId(activeTabId)) {
+        persistTempTabSql(activeTabId, sql);
+        return;
+      }
+      const scriptId = scriptIdFromTabId(activeTabId);
+      if (scriptId != null) {
+        persistDraftForScript(scriptId, sql);
       }
     },
-    [activeScriptId, persistDraftForScript],
+    [activeTabId, persistDraftForScript, persistTempTabSql],
   );
 
-  const loadDraftForScript = useCallback(
-    (scriptId: number) => {
+  const loadDraftForTab = useCallback(
+    (tabId: string) => {
+      if (isTempTabId(tabId)) {
+        const temp = tempTabsRef.current[tabId];
+        setDraftSqlState(temp?.sql ?? "");
+        return;
+      }
+      const scriptId = scriptIdFromTabId(tabId);
+      if (scriptId == null) {
+        setDraftSqlState("");
+        return;
+      }
       const cached = draftByScriptIdRef.current[scriptId];
       if (cached !== undefined) {
         setDraftSqlState(cached);
@@ -128,16 +184,31 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     }
   }, [activeScriptId, activeScriptQuery.data]);
 
-  const switchActiveScript = useCallback(
-    (id: number) => {
-      if (activeScriptId != null) {
-        persistDraftForScript(activeScriptId, draftSql);
+  const switchActiveTab = useCallback(
+    (tabId: string) => {
+      if (activeTabId != null) {
+        if (isTempTabId(activeTabId)) {
+          persistTempTabSql(activeTabId, draftSql);
+        } else {
+          const scriptId = scriptIdFromTabId(activeTabId);
+          if (scriptId != null) {
+            persistDraftForScript(scriptId, draftSql);
+          }
+        }
       }
-      setActiveScriptId(id);
-      setUrlScriptId(id);
-      loadDraftForScript(id);
+      setActiveTabIdState(tabId);
+      const scriptId = scriptIdFromTabId(tabId);
+      setUrlScriptId(scriptId);
+      loadDraftForTab(tabId);
     },
-    [activeScriptId, draftSql, loadDraftForScript, persistDraftForScript, setUrlScriptId],
+    [
+      activeTabId,
+      draftSql,
+      loadDraftForTab,
+      persistDraftForScript,
+      persistTempTabSql,
+      setUrlScriptId,
+    ],
   );
 
   const saveMutation = useMutation({
@@ -149,8 +220,22 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     },
   });
 
+  const createScriptMutation = useMutation({
+    mutationFn: (input: { workspaceId: number; title: string; sql: string }) =>
+      createScript({
+        workspace_id: input.workspaceId,
+        title: input.title,
+        sql_text: input.sql,
+      }),
+    onSuccess: (script) => {
+      queryClient.setQueryData(["script", script.id], script);
+      void queryClient.invalidateQueries({ queryKey: ["scripts"] });
+    },
+  });
+
   const favoriteMutation = useMutation({
-    mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) => setScriptFavorite(id, favorite),
+    mutationFn: ({ id, favorite }: { id: number; favorite: boolean }) =>
+      setScriptFavorite(id, favorite),
     onMutate: async ({ id, favorite }) => {
       await queryClient.cancelQueries({ queryKey: ["scripts"] });
       const prev = queryClient.getQueryData<Script[]>(["scripts"]);
@@ -164,7 +249,11 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     onError: (err, _vars, ctx) => {
       if (ctx?.prev) queryClient.setQueryData(["scripts"], ctx.prev);
       const message =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Request failed";
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Request failed";
       showValidationError(message);
     },
     onSuccess: (script) => {
@@ -173,7 +262,9 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       );
       queryClient.setQueryData(["script", script.id], script);
       showSuccess(
-        script.is_favorite ? `Added "${script.title}" to favorites` : `Removed "${script.title}" from favorites`,
+        script.is_favorite
+          ? `Added "${script.title}" to favorites`
+          : `Removed "${script.title}" from favorites`,
       );
     },
   });
@@ -189,7 +280,11 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     },
     onError: (err) => {
       const message =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Request failed";
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Request failed";
       showValidationError(message);
     },
   });
@@ -205,7 +300,11 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     },
     onError: (err) => {
       const message =
-        err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Request failed";
+        err instanceof ApiError
+          ? err.message
+          : err instanceof Error
+            ? err.message
+            : "Request failed";
       showValidationError(message);
     },
   });
@@ -215,13 +314,33 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   const favoriteScripts = useMemo(() => getFavoriteScripts(scripts), [scripts]);
 
   const openedTabs = useMemo(
-    () => buildOpenedTabs(openScriptIds, scripts, workspaces, draftByScriptIdRef.current),
-    [openScriptIds, scripts, workspaces, draftSql],
+    () =>
+      buildOpenedTabs(
+        openTabIds,
+        scripts,
+        workspaces,
+        draftByScriptIdRef.current,
+        tempTabsRef.current,
+      ),
+    [openTabIds, scripts, workspaces, draftSql, tempTabsVersion],
   );
 
   const activeTab = useMemo(
-    () => openedTabs.find((tab) => tab.scriptId === activeScriptId),
-    [openedTabs, activeScriptId],
+    () => openedTabs.find((tab) => tab.tabId === activeTabId),
+    [openedTabs, activeTabId],
+  );
+
+  const checkTabDirty = useCallback(
+    (tabId: string) => {
+      if (isTempTabId(tabId)) {
+        const temp = tempTabsRef.current[tabId];
+        return temp ? isTempTabDirty(temp) : false;
+      }
+      const scriptId = scriptIdFromTabId(tabId);
+      if (scriptId == null) return false;
+      return isScriptDirty(scriptId, draftByScriptIdRef.current, scripts);
+    },
+    [scripts, draftSql, tempTabsVersion],
   );
 
   const checkScriptDirty = useCallback(
@@ -252,6 +371,7 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       const script = resolveScript(id);
       if (!script) return;
       setRenameScriptTarget(null);
+      setEditTempTabTarget(null);
       setEditScriptTarget({
         id: script.id,
         title: script.title,
@@ -261,11 +381,20 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
     [resolveScript],
   );
 
+  const openEditTempTab = useCallback((tabId: string) => {
+    const temp = tempTabsRef.current[tabId];
+    if (!temp) return;
+    setEditScriptTarget(null);
+    setRenameScriptTarget(null);
+    setEditTempTabTarget({ tabId, title: temp.title });
+  }, []);
+
   const openRenameScript = useCallback(
     (id: number) => {
       const script = resolveScript(id);
       if (!script) return;
       setEditScriptTarget(null);
+      setEditTempTabTarget(null);
       setRenameScriptTarget({
         id: script.id,
         title: script.title,
@@ -277,23 +406,33 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
 
   const openScript = useCallback(
     (id: number) => {
-      setOpenScriptIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
-      switchActiveScript(id);
+      const tabId = tabIdFromScriptId(id);
+      setOpenTabIds((prev) => (prev.includes(tabId) ? prev : [...prev, tabId]));
+      switchActiveTab(tabId);
     },
-    [switchActiveScript],
+    [switchActiveTab],
   );
 
-  const closeScript = useCallback(
-    (id: number) => {
-      delete draftByScriptIdRef.current[id];
-      setOpenScriptIds((prev) => {
-        const next = prev.filter((x) => x !== id);
-        if (activeScriptId === id) {
-          const nextActive = resolveNextActiveTabId(prev, id);
-          setActiveScriptId(nextActive);
-          setUrlScriptId(nextActive);
+  const closeTab = useCallback(
+    (tabId: string) => {
+      if (isTempTabId(tabId)) {
+        delete tempTabsRef.current[tabId];
+        bumpTempTabs();
+      } else {
+        const scriptId = scriptIdFromTabId(tabId);
+        if (scriptId != null) {
+          delete draftByScriptIdRef.current[scriptId];
+        }
+      }
+
+      setOpenTabIds((prev) => {
+        const next = prev.filter((id) => id !== tabId);
+        if (activeTabId === tabId) {
+          const nextActive = resolveNextActiveTabId(prev, tabId);
+          setActiveTabIdState(nextActive);
+          setUrlScriptId(nextActive != null ? scriptIdFromTabId(nextActive) : null);
           if (nextActive != null) {
-            loadDraftForScript(nextActive);
+            loadDraftForTab(nextActive);
           } else {
             setDraftSqlState("");
           }
@@ -301,8 +440,128 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
         return next;
       });
     },
-    [activeScriptId, loadDraftForScript, setUrlScriptId],
+    [activeTabId, bumpTempTabs, loadDraftForTab, setUrlScriptId],
   );
+
+  const promoteTempTabToPersisted = useCallback(
+    (tabId: string, script: Script) => {
+      delete tempTabsRef.current[tabId];
+      bumpTempTabs();
+      const persistedTabId = tabIdFromScriptId(script.id);
+      draftByScriptIdRef.current[script.id] = script.sql_text;
+
+      setOpenTabIds((prev) => prev.map((id) => (id === tabId ? persistedTabId : id)));
+      if (activeTabId === tabId) {
+        setActiveTabIdState(persistedTabId);
+        setUrlScriptId(script.id);
+        setDraftSqlState(script.sql_text);
+      }
+    },
+    [activeTabId, bumpTempTabs, setUrlScriptId],
+  );
+
+  const saveTempTab = useCallback(
+    async (tabId: string, values: { title: string; workspaceId: number }) => {
+      const temp = tempTabsRef.current[tabId];
+      if (!temp) return false;
+
+      try {
+        const script = await createScriptMutation.mutateAsync({
+          workspaceId: values.workspaceId,
+          title: values.title,
+          sql: temp.sql,
+        });
+        promoteTempTabToPersisted(tabId, script);
+        showSaveScriptToast({ title: script.title });
+        return true;
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to save script";
+        showValidationError(message || "Failed to save script. Please try again.");
+        return false;
+      }
+    },
+    [createScriptMutation, promoteTempTabToPersisted],
+  );
+
+  const savePersistedTab = useCallback(
+    async (tabId: string): Promise<boolean> => {
+      const scriptId = scriptIdFromTabId(tabId);
+      if (scriptId == null) return false;
+
+      const sql = isTempTabId(tabId)
+        ? tempTabsRef.current[tabId]?.sql
+        : (draftByScriptIdRef.current[scriptId] ??
+          scripts.find((s) => s.id === scriptId)?.sql_text ??
+          "");
+
+      if (activeTabId !== tabId) {
+        switchActiveTab(tabId);
+      }
+
+      try {
+        const script = await updateScript(scriptId, { sql_text: sql ?? "" });
+        queryClient.setQueryData(["script", script.id], script);
+        persistDraftForScript(script.id, script.sql_text);
+        await queryClient.invalidateQueries({ queryKey: ["scripts"] });
+        return true;
+      } catch (err) {
+        const message =
+          err instanceof ApiError
+            ? err.message
+            : err instanceof Error
+              ? err.message
+              : "Failed to save script";
+        showValidationError(message || "Failed to save script. Please try again.");
+        return false;
+      }
+    },
+    [activeTabId, persistDraftForScript, queryClient, scripts, switchActiveTab],
+  );
+
+  const openSaveDialogForTab = useCallback(
+    (tabId: string, options?: { closeAfterSave?: boolean }) => {
+      const temp = tempTabsRef.current[tabId];
+      const tab = openedTabs.find((t) => t.tabId === tabId);
+      if (!tab && !temp) return;
+
+      closeAfterSaveTabIdRef.current = options?.closeAfterSave ? tabId : null;
+      setSaveScriptTarget({
+        tabId,
+        title: tab?.scriptName ?? temp?.title ?? "Untitled.sql",
+        workspaceId: tab?.projectId ?? temp?.workspaceId ?? null,
+      });
+    },
+    [openedTabs],
+  );
+
+  const saveTab = useCallback(
+    async (tabId: string, options?: { closeAfterSave?: boolean }): Promise<boolean> => {
+      const tab = openedTabs.find((t) => t.tabId === tabId);
+      if (!tab) return false;
+
+      if (!tab.isPersisted) {
+        openSaveDialogForTab(tabId, options);
+        return false;
+      }
+
+      const saved = await savePersistedTab(tabId);
+      if (saved && options?.closeAfterSave) {
+        closeTab(tabId);
+      }
+      return saved;
+    },
+    [closeTab, openedTabs, openSaveDialogForTab, savePersistedTab],
+  );
+
+  const saveActiveScript = useCallback(async (): Promise<boolean> => {
+    if (activeTabId == null) return false;
+    return saveTab(activeTabId);
+  }, [activeTabId, saveTab]);
 
   const refetchAll = useCallback(() => {
     void meQuery.refetch();
@@ -313,40 +572,42 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
   const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
 
   const createNewScript = useCallback(
-    async (workspaceId?: number) => {
-      const workspaces = workspacesQuery.data;
-      if (!workspaces?.length) return;
+    (workspaceId?: number) => {
+      const allWorkspaces = workspacesQuery.data;
+      if (!allWorkspaces?.length) return;
 
       const wsId =
         workspaceId ??
         (selectedConnection?.projectId ? Number(selectedConnection.projectId) : undefined) ??
-        workspaces[0].id;
+        allWorkspaces[0].id;
 
-      const ws = workspaces.find((w) => w.id === wsId) ?? workspaces[0];
-      const existing = scriptsQuery.data ?? [];
-      const title = generateNewScriptTitle(existing.filter((s) => s.workspace_id === ws.id));
+      const ws = allWorkspaces.find((w) => w.id === wsId) ?? allWorkspaces[0];
+      const existingTempTabs = Object.values(tempTabsRef.current);
+      const temp = createTempScriptTab({
+        workspaceId: ws.id,
+        workspaceName: ws.name,
+        connectionId:
+          selectedConnection?.connectionId != null ? String(selectedConnection.connectionId) : null,
+        existingTempTabs,
+      });
 
-      try {
-        const script = await createScript({
-          workspace_id: ws.id,
-          title,
-          sql_text: "SELECT 1;",
-        });
-        await queryClient.invalidateQueries({ queryKey: ["scripts"] });
-        queryClient.setQueryData(["script", script.id], script);
-        draftByScriptIdRef.current[script.id] = script.sql_text;
-        openScript(script.id);
-      } catch (err) {
-        const message =
-          err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Failed to create script";
-        showValidationError(message);
-      }
+      tempTabsRef.current[temp.tempId] = temp;
+      bumpTempTabs();
+      setOpenTabIds((prev) => [...prev, temp.tempId]);
+      switchActiveTab(temp.tempId);
     },
-    [workspacesQuery.data, scriptsQuery.data, selectedConnection?.projectId, queryClient, openScript],
+    [
+      workspacesQuery.data,
+      selectedConnection?.projectId,
+      selectedConnection?.connectionId,
+      bumpTempTabs,
+      switchActiveTab,
+    ],
   );
 
   const isLoading = meQuery.isLoading || workspacesQuery.isLoading || scriptsQuery.isLoading;
   const error = (meQuery.error ?? workspacesQuery.error ?? scriptsQuery.error) as Error | null;
+  const isSaving = saveMutation.isPending || createScriptMutation.isPending;
 
   const value = useMemo<KueriAppContextValue>(
     () => ({
@@ -357,25 +618,26 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       isLoading,
       isTogglingFavorite: favoriteMutation.isPending,
       error,
-      openScriptIds,
+      openTabIds,
       openedTabs,
+      activeTabId,
       activeScriptId,
       activeScript: activeScriptQuery.data,
       activeTab,
       draftSql,
       setDraftSql,
       openScript,
-      closeScript,
+      closeTab,
+      isTabDirty: checkTabDirty,
       isScriptDirty: checkScriptDirty,
-      setActiveScriptId: switchActiveScript,
-      saveActiveScript: async () => {
-        if (activeScriptId == null) return;
-        await saveMutation.mutateAsync();
-      },
-      isSaving: saveMutation.isPending,
+      setActiveTabId: switchActiveTab,
+      saveActiveScript,
+      saveTab,
+      isSaving,
       refetchAll,
       createNewScript,
       openEditScript,
+      openEditTempTab,
       openRenameScript,
       toggleFavorite,
     }),
@@ -387,20 +649,25 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
       isLoading,
       favoriteMutation.isPending,
       error,
-      openScriptIds,
+      openTabIds,
       openedTabs,
+      activeTabId,
       activeScriptId,
       activeScriptQuery.data,
       activeTab,
       draftSql,
       openScript,
-      closeScript,
+      closeTab,
+      checkTabDirty,
       checkScriptDirty,
-      switchActiveScript,
-      saveMutation,
+      switchActiveTab,
+      saveActiveScript,
+      saveTab,
+      isSaving,
       refetchAll,
       createNewScript,
       openEditScript,
+      openEditTempTab,
       openRenameScript,
       toggleFavorite,
     ],
@@ -454,6 +721,66 @@ export function KueriAppProvider({ children }: { children: ReactNode }) {
               return;
             }
             editScriptMutation.mutate({ ...editScriptTarget, ...values });
+          }}
+        />
+      )}
+      {editTempTabTarget && (
+        <RenameDialog
+          open
+          onOpenChange={(open) => {
+            if (!open) setEditTempTabTarget(null);
+          }}
+          title="Rename script"
+          description="Update the tab name. Save the script to persist it to a project."
+          label="Script name"
+          initialName={stripScriptTitleExtension(editTempTabTarget.title)}
+          placeholder="my-query"
+          onSubmit={(name) => {
+            if (!name) {
+              showValidationError("Script name is required");
+              return;
+            }
+            const title = toScriptTitle(name);
+            const temp = tempTabsRef.current[editTempTabTarget.tabId];
+            if (!temp) return;
+            tempTabsRef.current[editTempTabTarget.tabId] = {
+              ...temp,
+              title,
+              isDirty: true,
+            };
+            bumpTempTabs();
+            setEditTempTabTarget(null);
+          }}
+        />
+      )}
+      {saveScriptTarget && (
+        <SaveScriptDialog
+          open
+          initialTitle={saveScriptTarget.title}
+          initialWorkspaceId={saveScriptTarget.workspaceId}
+          workspaces={workspaces}
+          isPending={createScriptMutation.isPending}
+          onOpenChange={(open) => {
+            if (!open) setSaveScriptTarget(null);
+          }}
+          onSubmit={async (values) => {
+            if (!values.title) {
+              showValidationError("Script name is required");
+              return;
+            }
+            if (isReservedScriptTitle(values.title)) {
+              showValidationError("Choose a name other than untitled");
+              return;
+            }
+            const saved = await saveTempTab(saveScriptTarget.tabId, values);
+            if (saved) {
+              const closeTabId = closeAfterSaveTabIdRef.current;
+              closeAfterSaveTabIdRef.current = null;
+              setSaveScriptTarget(null);
+              if (closeTabId === saveScriptTarget.tabId) {
+                closeTab(closeTabId);
+              }
+            }
           }}
         />
       )}
