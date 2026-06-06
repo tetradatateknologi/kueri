@@ -6,6 +6,7 @@ import { EditorResultsStack } from "@/components/kueri/EditorResultsStack";
 import { ExportModal } from "@/components/kueri/ExportModal";
 import { QueryHistorySheet } from "@/components/kueri/QueryHistorySheet";
 import { SchemaExplorerPanel } from "@/components/kueri/SchemaExplorerPanel";
+import { UnsavedChangesDialog } from "@/components/kueri/UnsavedChangesDialog";
 import {
   ResizableHandle,
   ResizablePanel,
@@ -26,6 +27,7 @@ import { formatShortcut } from "@/lib/hotkeys";
 import { ApiError, executeQuery } from "@/lib/api/http";
 import { DEFAULT_QUERY_LIMIT } from "@/lib/api/query-config";
 import { useExecuteQuery } from "@/lib/api/queries";
+import { formatEditorContextLabel } from "@/lib/editor-tabs";
 import { saveScript } from "@/lib/saved-scripts";
 import {
   showQueryErrorToast,
@@ -39,15 +41,16 @@ import { useWorkspaceStore } from "@/stores/workspace-store";
 export function Workspace() {
   const {
     workspaces,
-    scripts,
     favoriteScripts,
-    openScriptIds,
+    openedTabs,
     activeScriptId,
     activeScript,
+    activeTab,
     draftSql,
     setDraftSql,
     openScript,
     closeScript,
+    isScriptDirty,
     setActiveScriptId,
     saveActiveScript,
     isSaving,
@@ -80,20 +83,30 @@ export function Workspace() {
   const [exportOpen, setExportOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [schemaOpen, setSchemaOpen] = useState(true);
+  const [pendingCloseScriptId, setPendingCloseScriptId] = useState<number | null>(null);
 
-  const openTabs = openScriptIds
-    .map((id) => scripts.find((s) => s.id === id))
-    .filter((s): s is NonNullable<typeof s> => s != null);
+  const activeTitle = activeScript?.title ?? activeTab?.scriptName ?? "untitled.sql";
+  const hasOpenTab = openedTabs.length > 0;
+  const activeContextLabel = activeTab ? formatEditorContextLabel(activeTab) : null;
 
-  const activeTitle = activeScript?.title ?? "untitled.sql";
-  const hasOpenTab = openScriptIds.length > 0;
+  const requestCloseScript = useCallback(
+    (scriptId: number) => {
+      if (isScriptDirty(scriptId)) {
+        setPendingCloseScriptId(scriptId);
+        return;
+      }
+      closeScript(scriptId);
+    },
+    [closeScript, isScriptDirty],
+  );
 
   useEffect(() => {
-    if (openScriptIds.length === 0) {
+    if (!hasOpenTab) {
       setLastResult(null);
       setLastQueryError(null);
+      setResultsView("results");
     }
-  }, [openScriptIds.length, setLastQueryError, setLastResult]);
+  }, [hasOpenTab, setLastQueryError, setLastResult, setResultsView]);
 
   const runQuery = useCallback(() => {
     if (!hasOpenTab) return;
@@ -223,7 +236,7 @@ export function Workspace() {
       onSave: () => void handleSave(),
       onNewTab: () => void createNewScript(),
       onCloseTab: () => {
-        if (activeScriptId != null) closeScript(activeScriptId);
+        if (activeScriptId != null) requestCloseScript(activeScriptId);
       },
       onEditScript: () => {
         if (activeScriptId != null) openEditScript(activeScriptId);
@@ -241,19 +254,21 @@ export function Workspace() {
       onFocusSidebarSearch: focusSidebarSearch,
       onCycleConnection: cycleConnection,
       onNextTab: () => {
-        if (!openScriptIds.length || activeScriptId == null) return;
-        const i = openScriptIds.indexOf(activeScriptId);
-        const nextId = openScriptIds[(i + 1) % openScriptIds.length];
+        if (!openedTabs.length || activeScriptId == null) return;
+        const ids = openedTabs.map((tab) => tab.scriptId);
+        const i = ids.indexOf(activeScriptId);
+        const nextId = ids[(i + 1) % ids.length];
         setActiveScriptId(nextId);
       },
       onPrevTab: () => {
-        if (!openScriptIds.length || activeScriptId == null) return;
-        const i = openScriptIds.indexOf(activeScriptId);
-        const prevId = openScriptIds[(i - 1 + openScriptIds.length) % openScriptIds.length];
+        if (!openedTabs.length || activeScriptId == null) return;
+        const ids = openedTabs.map((tab) => tab.scriptId);
+        const i = ids.indexOf(activeScriptId);
+        const prevId = ids[(i - 1 + ids.length) % ids.length];
         setActiveScriptId(prevId);
       },
       onSwitchTab: (index: number) => {
-        const id = openScriptIds[index];
+        const id = openedTabs[index]?.scriptId;
         if (id != null) setActiveScriptId(id);
       },
       onResultsView: (view: "results" | "json") => setResultsView(view),
@@ -261,12 +276,12 @@ export function Workspace() {
     [
       runQuery,
       activeScriptId,
-      closeScript,
+      requestCloseScript,
       createNewScript,
       openEditScript,
       openRenameScript,
       toggleFavorite,
-      openScriptIds,
+      openedTabs,
       setActiveScriptId,
       lastResult,
       focusSidebarSearch,
@@ -315,47 +330,56 @@ export function Workspace() {
             </TooltipContent>
           </Tooltip>
           <div className="flex items-end gap-px overflow-x-auto min-w-0 flex-1">
-            {openTabs.map((t) => {
-              const isActive = t.id === activeScriptId;
+            {openedTabs.map((tab) => {
+              const isActive = tab.scriptId === activeScriptId;
+              const tabLabel = formatEditorContextLabel(tab);
               return (
                 <div
-                  key={t.id}
+                  key={tab.scriptId}
                   role="tab"
                   aria-selected={isActive}
                   tabIndex={isActive ? 0 : -1}
+                  title={tabLabel}
                   onClick={() => {
                     if (isActive) {
-                      openEditScript(t.id);
+                      openEditScript(tab.scriptId);
                     } else {
-                      setActiveScriptId(t.id);
+                      setActiveScriptId(tab.scriptId);
                     }
                   }}
                   onKeyDown={(e) => {
                     if (e.key === "Enter" || e.key === " ") {
                       e.preventDefault();
                       if (isActive) {
-                        openEditScript(t.id);
+                        openEditScript(tab.scriptId);
                       } else {
-                        setActiveScriptId(t.id);
+                        setActiveScriptId(tab.scriptId);
                       }
                     }
                   }}
                   className={cn(
-                    "group h-9 pl-3 pr-1.5 flex items-center gap-2 text-xs cursor-pointer border-t-2 transition-colors rounded-t-md outline-none focus-visible:ring-1 focus-visible:ring-electric",
+                    "group h-9 pl-3 pr-1.5 flex items-center gap-2 text-xs cursor-pointer border-t-2 transition-colors rounded-t-md outline-none focus-visible:ring-1 focus-visible:ring-electric max-w-[240px]",
                     isActive
                       ? "bg-surface-1 border-electric text-foreground"
                       : "bg-transparent border-transparent text-muted-foreground hover:text-foreground hover:bg-surface-1/40",
                   )}
                 >
-                  <span className="font-mono">{t.title}</span>
+                  <span className="font-mono truncate">
+                    {tab.isDirty ? (
+                      <span className="text-electric mr-1" aria-hidden>
+                        •
+                      </span>
+                    ) : null}
+                    {tab.scriptName}
+                  </span>
                   <button
                     type="button"
-                    aria-label={`Close ${t.title}`}
+                    aria-label={`Close ${tab.scriptName}`}
                     onClick={(e) => {
                       e.stopPropagation();
-                      closeScript(t.id);
+                      requestCloseScript(tab.scriptId);
                     }}
-                    className="size-4 rounded hover:bg-border flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity"
+                    className="size-4 rounded hover:bg-border flex items-center justify-center opacity-0 group-hover:opacity-100 focus:opacity-100 transition-opacity shrink-0"
                   >
                     <X className="size-3" />
                   </button>
@@ -376,6 +400,15 @@ export function Workspace() {
         <div className="h-12 px-2 sm:px-3 flex items-center gap-1.5 sm:gap-2 border-b border-border bg-background min-w-0">
           <div className="flex items-center gap-1.5 sm:gap-2 min-w-0 overflow-hidden">
             <EnvironmentBadge env={env} />
+
+            {activeContextLabel && (
+              <span
+                className="text-[11px] text-foreground font-mono truncate min-w-0"
+                title={activeContextLabel}
+              >
+                {activeContextLabel}
+              </span>
+            )}
 
             {selectedConnection && (
               <span className="hidden lg:inline text-[11px] text-muted-foreground font-mono truncate min-w-0">
@@ -545,6 +578,18 @@ export function Workspace() {
           open={historyOpen}
           onOpenChange={setHistoryOpen}
           onPickSql={setDraftSql}
+        />
+        <UnsavedChangesDialog
+          open={pendingCloseScriptId != null}
+          onOpenChange={(open) => {
+            if (!open) setPendingCloseScriptId(null);
+          }}
+          onConfirm={() => {
+            if (pendingCloseScriptId != null) {
+              closeScript(pendingCloseScriptId);
+            }
+            setPendingCloseScriptId(null);
+          }}
         />
       </div>
     </TooltipProvider>

@@ -6,7 +6,6 @@ import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
 import {
   findConnectionInWorkspaces,
-  findScriptWorkspaceId,
   readAppUrlFromLocation,
   resolveWorkspaceByProjectParam,
   writeAppUrl,
@@ -31,7 +30,7 @@ function toSelectedConnection(
 
 export function AppUrlSync() {
   const { workspaces, scripts, isLoading, openScript, activeScriptId } = useKueriApp();
-  const { snapshot, historyEpoch, setProjectFilter } = useAppUrl();
+  const { snapshot, historyEpoch } = useAppUrl();
   const projectWorkspaceId = useProjectWorkspaceId(workspaces);
   const selectedConnectionId = useWorkspaceStore((s) => s.selectedConnection?.connectionId);
   const { selectConnection } = useSelectConnection();
@@ -128,20 +127,6 @@ export function AppUrlSync() {
     openScript,
     selectConnection,
   ]);
-
-  // Keep URL `project` in sync when the user switches script tabs — not when they
-  // change the sidebar project filter (that would immediately revert their selection).
-  useEffect(() => {
-    if (activeScriptId == null) return;
-
-    const scriptWorkspaceId = findScriptWorkspaceId(activeScriptId, scripts);
-    if (scriptWorkspaceId == null) return;
-
-    const ws = workspaces.find((w) => w.id === scriptWorkspaceId);
-    if (ws) {
-      setProjectFilter(ws);
-    }
-  }, [activeScriptId, scripts, workspaces, setProjectFilter]);
 
   return null;
 }
