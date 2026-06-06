@@ -24,6 +24,12 @@ describe("readAppUrlFromSearch", () => {
     expect(snap.view).toBe("settings");
     expect(snap.settingsSection).toBe("shortcuts");
   });
+
+  it("parses appearance settings section", () => {
+    const snap = readAppUrlFromSearch("?view=settings&section=appearance");
+    expect(snap.view).toBe("settings");
+    expect(snap.settingsSection).toBe("appearance");
+  });
 });
 
 describe("buildAppUrlSearchParams", () => {

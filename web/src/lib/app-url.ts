@@ -30,6 +30,7 @@ export type AppUrlPatch = {
 const SETTINGS_SECTIONS = new Set<SettingsSection>([
   "guide",
   "shortcuts",
+  "appearance",
   "backup",
   "about",
   "contribute",

@@ -12,7 +12,13 @@ import { readAppUrlFromLocation } from "@/lib/app-url";
 
 export type AppView = "workspace" | "settings";
 
-export type SettingsSection = "guide" | "shortcuts" | "backup" | "about" | "contribute";
+export type SettingsSection =
+  | "guide"
+  | "shortcuts"
+  | "appearance"
+  | "backup"
+  | "about"
+  | "contribute";
 
 type AppViewContextValue = {
   view: AppView;

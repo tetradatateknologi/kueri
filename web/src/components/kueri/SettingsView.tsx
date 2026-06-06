@@ -1,7 +1,16 @@
-import { ArrowLeft, BookOpen, DatabaseBackup, Heart, Info, Keyboard } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  DatabaseBackup,
+  Heart,
+  Info,
+  Keyboard,
+  Palette,
+} from "lucide-react";
 
 import { KeyboardShortcutsGuide } from "@/components/kueri/KeyboardShortcutsGuide";
 import { SettingsAboutSection } from "@/components/kueri/SettingsAboutSection";
+import { SettingsAppearanceSection } from "@/components/kueri/SettingsAppearanceSection";
 import { SettingsBackupSection } from "@/components/kueri/SettingsBackupSection";
 import { SettingsContributeSection } from "@/components/kueri/SettingsContributeSection";
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -12,6 +21,7 @@ import { cn } from "@/lib/utils";
 const NAV: { id: SettingsSection; label: string; icon: typeof BookOpen }[] = [
   { id: "guide", label: "Guide", icon: BookOpen },
   { id: "shortcuts", label: "Keyboard shortcuts", icon: Keyboard },
+  { id: "appearance", label: "Appearance", icon: Palette },
   { id: "backup", label: "Data backup", icon: DatabaseBackup },
   { id: "about", label: "About & updates", icon: Info },
   { id: "contribute", label: "Support & contribute", icon: Heart },
@@ -91,6 +101,8 @@ export function SettingsView() {
               <KeyboardShortcutsGuide />
             </div>
           )}
+
+          {settingsSection === "appearance" && <SettingsAppearanceSection />}
 
           {settingsSection === "contribute" && <SettingsContributeSection />}
 
