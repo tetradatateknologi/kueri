@@ -1,6 +1,11 @@
 export { extractReferencedTables, extractSimpleTableAliases } from "./aliases";
 export { getCompletionReplaceRange, getSqlCompletionContext } from "./context";
-export { createSqlCompletionExtension, getSqlDialect, sqlCompletionCompartment } from "./codemirror";
+export {
+  createSqlCompletionExtension,
+  getSqlDialect,
+  reconfigureSqlCompletion,
+  sqlCompletionCompartment,
+} from "./codemirror";
 export { needsIdentifierQuoting, quoteIdentifierIfNeeded } from "./identifier";
 export { buildSqlCompletions } from "./suggestions";
 export { useSqlCompletionSchema } from "./use-sql-completion-schema";

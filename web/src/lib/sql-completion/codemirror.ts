@@ -7,53 +7,59 @@ import type { SqlCompletionSchema } from "./types";
 
 export const sqlCompletionCompartment = new Compartment();
 
+function createSqlAutocompletion(getSchema: () => SqlCompletionSchema | null): Extension {
+  return autocompletion({
+    activateOnTyping: true,
+    maxRenderedOptions: 50,
+    override: [
+      (context: CmCompletionContext) => {
+        const schema = getSchema();
+        if (!schema || schema.isLoading || schema.connectionId <= 0) {
+          return null;
+        }
+
+        const sql = context.state.doc.toString();
+        const completionContext = getSqlCompletionContext({
+          sql,
+          cursorOffset: context.pos,
+        });
+
+        if (completionContext.type === "none") {
+          return null;
+        }
+
+        const replaceRange = getCompletionReplaceRange(sql, context.pos);
+        const word = context.matchBefore(/[\w."`]*$/);
+        const from = word ? word.from : replaceRange.from;
+
+        const options = buildSqlCompletions({
+          schema,
+          sql,
+          cursorOffset: context.pos,
+          context: completionContext,
+        });
+
+        if (options.length === 0) {
+          return null;
+        }
+
+        return {
+          from,
+          to: context.pos,
+          options,
+          validFor: /^[\w."`]*$/,
+        };
+      },
+    ],
+  });
+}
+
 export function createSqlCompletionExtension(getSchema: () => SqlCompletionSchema | null): Extension {
-  return sqlCompletionCompartment.of(
-    autocompletion({
-      activateOnTyping: true,
-      maxRenderedOptions: 50,
-      override: [
-        (context: CmCompletionContext) => {
-          const schema = getSchema();
-          if (!schema || schema.isLoading || schema.connectionId <= 0) {
-            return null;
-          }
+  return sqlCompletionCompartment.of(createSqlAutocompletion(getSchema));
+}
 
-          const sql = context.state.doc.toString();
-          const completionContext = getSqlCompletionContext({
-            sql,
-            cursorOffset: context.pos,
-          });
-
-          if (completionContext.type === "none") {
-            return null;
-          }
-
-          const replaceRange = getCompletionReplaceRange(sql, context.pos);
-          const word = context.matchBefore(/[\w."`]*$/);
-          const from = word ? word.from : replaceRange.from;
-
-          const options = buildSqlCompletions({
-            schema,
-            sql,
-            cursorOffset: context.pos,
-            context: completionContext,
-          });
-
-          if (options.length === 0) {
-            return null;
-          }
-
-          return {
-            from,
-            to: context.pos,
-            options,
-            validFor: /^[\w."`]*$/,
-          };
-        },
-      ],
-    }),
-  );
+export function reconfigureSqlCompletion(getSchema: () => SqlCompletionSchema | null) {
+  return sqlCompletionCompartment.reconfigure(createSqlAutocompletion(getSchema));
 }
 
 export function getSqlDialect(driver: string | undefined) {

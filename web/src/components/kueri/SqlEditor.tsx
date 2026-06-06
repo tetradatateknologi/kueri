@@ -15,7 +15,7 @@ import { getEditorThemeExtensions } from "@/lib/codemirror-theme";
 import {
   createSqlCompletionExtension,
   getSqlDialect,
-  sqlCompletionCompartment,
+  reconfigureSqlCompletion,
   useSqlCompletionSchema,
 } from "@/lib/sql-completion";
 import { cn } from "@/lib/utils";
@@ -132,9 +132,7 @@ export function SqlEditor({
     const view = viewRef.current;
     if (!view) return;
     view.dispatch({
-      effects: sqlCompletionCompartment.reconfigure(
-        createSqlCompletionExtension(() => completionSchemaRef.current),
-      ),
+      effects: reconfigureSqlCompletion(() => completionSchemaRef.current),
     });
   }, [completionSchema]);
 
