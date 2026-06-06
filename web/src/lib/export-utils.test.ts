@@ -42,6 +42,10 @@ describe("resultToCsv", () => {
       rowCount: 1,
       durationMs: 1,
       cached: false,
+      limit: 20,
+      offset: 0,
+      hasMore: false,
+      autoLimitApplied: true,
     };
     expect(resultToCsv(result)).toBe('name,note\nAva,"said ""hi"""');
   });

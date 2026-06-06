@@ -28,7 +28,7 @@ func NewExecutor(pool *pgxpool.Pool, box *secrets.Box) *Executor {
 	return &Executor{q: sqlc.New(pool), box: box}
 }
 
-func (e *Executor) Execute(ctx context.Context, userID int64, connectionID int64, sql string) (ExecuteResult, error) {
+func (e *Executor) Execute(ctx context.Context, userID int64, connectionID int64, sql string, limit, offset int) (ExecuteResult, error) {
 	conn, err := e.q.GetConnectionForUser(ctx, sqlc.GetConnectionForUserParams{
 		ID:     connectionID,
 		UserID: userID,
@@ -52,16 +52,25 @@ func (e *Executor) Execute(ctx context.Context, userID int64, connectionID int64
 	execCtx, cancel := context.WithTimeout(ctx, queryTimeout)
 	defer cancel()
 
+	paginatedSQL, isReadQuery, autoLimitApplied := PreparePaginatedSQL(sql, limit+1, offset)
+	execSQL := sql
+	fetchLimit := limit + 1
+	if isReadQuery {
+		execSQL = paginatedSQL
+	} else {
+		fetchLimit = maxRows
+	}
+
 	switch conn.Driver {
 	case sqlc.ConnectionDriverPostgres:
-		result, err := e.executePostgres(execCtx, conn, password, sql)
+		result, err := e.executePostgres(execCtx, conn, password, execSQL, limit, offset, fetchLimit, isReadQuery, autoLimitApplied)
 		if err != nil {
 			return ExecuteResult{}, err
 		}
 		result.DurationMs = time.Since(start).Milliseconds()
 		return result, nil
 	case sqlc.ConnectionDriverMysql:
-		result, err := e.executeMySQL(execCtx, conn, password, sql)
+		result, err := e.executeMySQL(execCtx, conn, password, execSQL, limit, offset, fetchLimit, isReadQuery, autoLimitApplied)
 		if err != nil {
 			return ExecuteResult{}, err
 		}
@@ -72,7 +81,13 @@ func (e *Executor) Execute(ctx context.Context, userID int64, connectionID int64
 	}
 }
 
-func (e *Executor) executePostgres(ctx context.Context, conn sqlc.Connection, password, sql string) (ExecuteResult, error) {
+func (e *Executor) executePostgres(
+	ctx context.Context,
+	conn sqlc.Connection,
+	password, sql string,
+	limit, offset, fetchLimit int,
+	isReadQuery, autoLimitApplied bool,
+) (ExecuteResult, error) {
 	dsn := database.PostgresDSN(conn, password)
 
 	target, err := pgx.Connect(ctx, dsn)
@@ -94,10 +109,9 @@ func (e *Executor) executePostgres(ctx context.Context, conn sqlc.Connection, pa
 	}
 
 	outRows := make([][]interface{}, 0)
-	rowCount := 0
 
 	for rows.Next() {
-		if rowCount >= maxRows {
+		if len(outRows) >= fetchLimit {
 			break
 		}
 		values, err := rows.Values()
@@ -105,27 +119,26 @@ func (e *Executor) executePostgres(ctx context.Context, conn sqlc.Connection, pa
 			return ExecuteResult{}, err
 		}
 		outRows = append(outRows, values)
-		rowCount++
 	}
 	if err := rows.Err(); err != nil {
 		return ExecuteResult{}, err
 	}
 
-	if rowCount == 0 && rows.CommandTag().RowsAffected() > 0 {
+	if len(outRows) == 0 && rows.CommandTag().RowsAffected() > 0 {
 		columns = []string{"rows_affected"}
 		outRows = [][]interface{}{{rows.CommandTag().RowsAffected()}}
-		rowCount = 1
 	}
 
-	return ExecuteResult{
-		Columns:  columns,
-		Rows:     outRows,
-		RowCount: rowCount,
-		Cached:   false,
-	}, nil
+	return finalizeExecuteResult(columns, outRows, limit, offset, isReadQuery, autoLimitApplied), nil
 }
 
-func (e *Executor) executeMySQL(ctx context.Context, conn sqlc.Connection, password, sql string) (ExecuteResult, error) {
+func (e *Executor) executeMySQL(
+	ctx context.Context,
+	conn sqlc.Connection,
+	password, sql string,
+	limit, offset, fetchLimit int,
+	isReadQuery, autoLimitApplied bool,
+) (ExecuteResult, error) {
 	db, err := database.OpenMySQL(conn, password)
 	if err != nil {
 		return ExecuteResult{}, err
@@ -144,10 +157,9 @@ func (e *Executor) executeMySQL(ctx context.Context, conn sqlc.Connection, passw
 	}
 
 	outRows := make([][]interface{}, 0)
-	rowCount := 0
 
 	for rows.Next() {
-		if rowCount >= maxRows {
+		if len(outRows) >= fetchLimit {
 			break
 		}
 		scanTargets := make([]interface{}, len(cols))
@@ -167,16 +179,34 @@ func (e *Executor) executeMySQL(ctx context.Context, conn sqlc.Connection, passw
 			}
 		}
 		outRows = append(outRows, values)
-		rowCount++
 	}
 	if err := rows.Err(); err != nil {
 		return ExecuteResult{}, err
 	}
 
+	return finalizeExecuteResult(cols, outRows, limit, offset, isReadQuery, autoLimitApplied), nil
+}
+
+func finalizeExecuteResult(
+	columns []string,
+	rows [][]interface{},
+	limit, offset int,
+	isReadQuery, autoLimitApplied bool,
+) ExecuteResult {
+	hasMore := false
+	if isReadQuery && len(rows) > limit {
+		hasMore = true
+		rows = rows[:limit]
+	}
+
 	return ExecuteResult{
-		Columns:  cols,
-		Rows:     outRows,
-		RowCount: rowCount,
-		Cached:   false,
-	}, nil
+		Columns:          columns,
+		Rows:             rows,
+		RowCount:         len(rows),
+		Cached:           false,
+		Limit:            limit,
+		Offset:           offset,
+		HasMore:          hasMore,
+		AutoLimitApplied: isReadQuery && autoLimitApplied,
+	}
 }

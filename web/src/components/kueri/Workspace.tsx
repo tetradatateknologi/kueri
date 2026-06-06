@@ -23,7 +23,8 @@ import { useKueriApp } from "@/context/kueri-app";
 import { useSelectConnection } from "@/context/select-connection";
 import { useKueriHotkeys } from "@/hooks/use-kueri-hotkeys";
 import { formatShortcut } from "@/lib/hotkeys";
-import { ApiError } from "@/lib/api/http";
+import { ApiError, executeQuery } from "@/lib/api/http";
+import { DEFAULT_QUERY_LIMIT } from "@/lib/api/query-config";
 import { useExecuteQuery } from "@/lib/api/queries";
 import { saveScript } from "@/lib/saved-scripts";
 import {
@@ -62,8 +63,13 @@ export function Workspace() {
   const lastResult = useWorkspaceStore((s) => s.lastResult);
   const lastQueryError = useWorkspaceStore((s) => s.lastQueryError);
   const resultsView = useWorkspaceStore((s) => s.resultsView);
+  const lastQuerySql = useWorkspaceStore((s) => s.lastQuerySql);
+  const lastQueryConnectionId = useWorkspaceStore((s) => s.lastQueryConnectionId);
   const setLastResult = useWorkspaceStore((s) => s.setLastResult);
   const setLastQueryError = useWorkspaceStore((s) => s.setLastQueryError);
+  const setLastQueryContext = useWorkspaceStore((s) => s.setLastQueryContext);
+  const appendResultRows = useWorkspaceStore((s) => s.appendResultRows);
+  const setResultLoadingMore = useWorkspaceStore((s) => s.setResultLoadingMore);
   const setResultsView = useWorkspaceStore((s) => s.setResultsView);
   const pushHistory = useWorkspaceStore((s) => s.pushHistory);
 
@@ -106,7 +112,8 @@ export function Workspace() {
       { sql, connection_id: connectionId },
       {
         onSuccess: (data) => {
-          setLastResult(data);
+          setLastQueryContext(sql, connectionId);
+          setLastResult({ ...data, loadingMore: false });
           pushHistory({
             sql,
             env,
@@ -133,10 +140,46 @@ export function Workspace() {
     selectedConnection?.connectionId,
     executeMutation,
     pushHistory,
+    setLastQueryContext,
     setLastQueryError,
     setLastResult,
     env,
     hasOpenTab,
+  ]);
+
+  const loadMoreRows = useCallback(() => {
+    const sql = lastQuerySql?.trim();
+    const connectionId = lastQueryConnectionId;
+    if (!sql || connectionId == null || !lastResult?.hasMore || lastResult.loadingMore) {
+      return;
+    }
+
+    setResultLoadingMore(true);
+    const offset = lastResult.rows.length;
+
+    void executeQuery({
+      sql,
+      connection_id: connectionId,
+      limit: DEFAULT_QUERY_LIMIT,
+      offset,
+    })
+      .then((data) => {
+        appendResultRows(data.rows, data.hasMore);
+      })
+      .catch((err) => {
+        setResultLoadingMore(false);
+        const message =
+          err instanceof ApiError ? err.message : err instanceof Error ? err.message : "Query failed";
+        setLastQueryError(message);
+        showQueryErrorToast(message);
+      });
+  }, [
+    appendResultRows,
+    lastQueryConnectionId,
+    lastQuerySql,
+    lastResult,
+    setLastQueryError,
+    setResultLoadingMore,
   ]);
 
   const cycleConnection = useCallback(() => {
@@ -237,7 +280,7 @@ export function Workspace() {
 
   const metaLabel =
     lastResult != null
-      ? `${lastResult.rowCount} rows • ${lastResult.durationMs} ms${lastResult.cached ? " • cached" : ""}`
+      ? `${lastResult.rows.length} rows loaded • ${lastResult.durationMs} ms${lastResult.cached ? " • cached" : ""}`
       : executeMutation.isPending
         ? "Running…"
         : null;
@@ -464,6 +507,7 @@ export function Workspace() {
                 lastResult={lastResult}
                 executeMutationIsPending={executeMutation.isPending}
                 lastQueryError={lastQueryError}
+                onLoadMore={loadMoreRows}
                 setExportOpen={setExportOpen}
               />
             </ResizablePanel>
@@ -486,6 +530,7 @@ export function Workspace() {
             lastResult={lastResult}
             executeMutationIsPending={executeMutation.isPending}
             lastQueryError={lastQueryError}
+            onLoadMore={loadMoreRows}
             setExportOpen={setExportOpen}
           />
         )}

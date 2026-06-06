@@ -7,5 +7,9 @@ export function normalizeRunResult(result: QueryRunResult, cached = false): Quer
     rowCount: result.row_count,
     durationMs: result.duration_ms,
     cached,
+    limit: result.row_count,
+    offset: 0,
+    hasMore: false,
+    autoLimitApplied: false,
   };
 }
