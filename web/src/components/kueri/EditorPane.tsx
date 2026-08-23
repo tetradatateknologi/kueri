@@ -6,7 +6,7 @@ import { WorkspaceEmptyState } from "@/components/kueri/WorkspaceEmptyState";
 type EditorPaneProps = {
   value: string;
   onChange: (value: string) => void;
-  onRun?: () => void;
+  onRun?: (statementSql: string) => void;
   onEditScript?: () => void;
   connectionId?: number | null;
 };

@@ -12,6 +12,7 @@ import { useEffect, useRef } from "react";
 
 import { useTheme } from "@/context/theme";
 import { getEditorThemeExtensions } from "@/lib/codemirror-theme";
+import { getStatementAtCursor } from "@/lib/sql-query";
 import {
   createSqlCompletionExtension,
   getSqlDialect,
@@ -23,7 +24,7 @@ import { cn } from "@/lib/utils";
 type SqlEditorProps = {
   value: string;
   onChange: (value: string) => void;
-  onRun?: () => void;
+  onRun?: (statementSql: string) => void;
   onEditScript?: () => void;
   readOnly?: boolean;
   connectionId?: number | null;
@@ -75,8 +76,10 @@ export function SqlEditor({
     const runKeymap = keymap.of([
       {
         key: "Mod-Enter",
-        run: () => {
-          onRunRef.current?.();
+        run: (view) => {
+          const doc = view.state.doc.toString();
+          const cursorOffset = view.state.selection.main.head;
+          onRunRef.current?.(getStatementAtCursor(doc, cursorOffset));
           return true;
         },
       },
