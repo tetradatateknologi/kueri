@@ -36,6 +36,10 @@ func (e *Executor) Execute(
 	limit, offset int,
 	filters []ColumnFilter,
 ) (ExecuteResult, error) {
+	if HasMultipleStatements(sql) {
+		return ExecuteResult{}, ErrMultipleStatements
+	}
+
 	conn, err := e.q.GetConnectionForUser(ctx, sqlc.GetConnectionForUserParams{
 		ID:     connectionID,
 		UserID: userID,

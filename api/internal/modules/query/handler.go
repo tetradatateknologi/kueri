@@ -69,6 +69,9 @@ func (h *Handler) Execute(c echo.Context) error {
 		if errors.Is(err, ErrInvalidFilter) {
 			return apphttp.BadRequest(c, err.Error())
 		}
+		if errors.Is(err, ErrMultipleStatements) {
+			return apphttp.BadRequest(c, err.Error())
+		}
 		return apphttp.QueryError(c, err.Error())
 	}
 
