@@ -2,9 +2,13 @@ import { toPng } from "html-to-image";
 import { jsPDF } from "jspdf";
 import JSZip from "jszip";
 import type { Node } from "@xyflow/react";
-import { getViewportForBounds } from "@xyflow/react";
+import { getNodesBounds, getViewportForBounds } from "@xyflow/react";
 
-import type { ErdTableNodeData } from "@/lib/schema-erd";
+import {
+  ERD_NODE_WIDTH,
+  estimateTableNodeHeight,
+  type ErdTableNodeData,
+} from "@/lib/schema-erd";
 
 export const ERD_EXPORT_PAGE_WIDTH_PX = 1920;
 export const ERD_EXPORT_PAGE_HEIGHT_PX = 1080;
@@ -14,6 +18,10 @@ export const ERD_EXPORT_PIXEL_RATIO = 2;
 export const ERD_EXPORT_MAX_PAGES = 20;
 export const ERD_EXPORT_WARN_TABLES = 50;
 export const ERD_EXPORT_ZOOM = 1;
+export const ERD_EXPORT_MIN_DATA_URL_LENGTH = 5000;
+
+export const ERD_EXPORT_BACKGROUND_LIGHT = "#f8f9fb";
+export const ERD_EXPORT_BACKGROUND_DARK = "#1c1f26";
 
 export type ErdExportRect = {
   x: number;
@@ -37,6 +45,33 @@ export const DEFAULT_ERD_EXPORT_TILE_OPTIONS: ErdExportTileOptions = {
   overlapRatio: ERD_EXPORT_OVERLAP_RATIO,
   zoom: ERD_EXPORT_ZOOM,
 };
+
+export function getErdExportBackgroundColor(): string {
+  if (typeof document === "undefined") {
+    return ERD_EXPORT_BACKGROUND_LIGHT;
+  }
+  return document.documentElement.classList.contains("dark")
+    ? ERD_EXPORT_BACKGROUND_DARK
+    : ERD_EXPORT_BACKGROUND_LIGHT;
+}
+
+export function enrichErdNodesForBounds(nodes: Node<ErdTableNodeData>[]): Node<ErdTableNodeData>[] {
+  return nodes.map((node) => {
+    if (node.width != null && node.height != null) {
+      return node;
+    }
+    const table = node.data.table;
+    return {
+      ...node,
+      width: node.width ?? ERD_NODE_WIDTH,
+      height: node.height ?? estimateTableNodeHeight(table),
+    };
+  });
+}
+
+export function resolveErdNodesBounds(nodes: Node<ErdTableNodeData>[]): ErdExportRect {
+  return getNodesBounds(enrichErdNodesForBounds(nodes));
+}
 
 export function computeErdExportTiles(
   bounds: ErdExportRect,
@@ -88,52 +123,96 @@ export function estimateExportPageCount(
   return computeErdExportTiles(bounds, options).length;
 }
 
-function nextFrame(): Promise<void> {
-  return new Promise((resolve) => {
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => resolve());
-    });
-  });
+export type ErdCaptureOptions = {
+  width: number;
+  height: number;
+  pixelRatio: number;
+  backgroundColor: string;
+  style: {
+    width: string;
+    height: string;
+    transform: string;
+  };
+};
+
+export function buildErdCaptureOptions(
+  tile: ErdExportRect,
+  backgroundColor: string = getErdExportBackgroundColor(),
+): ErdCaptureOptions {
+  const viewport = getViewportForBounds(
+    tile,
+    ERD_EXPORT_PAGE_WIDTH_PX,
+    ERD_EXPORT_PAGE_HEIGHT_PX,
+    0.05,
+    2,
+    ERD_EXPORT_PADDING_PX,
+  );
+
+  return {
+    width: ERD_EXPORT_PAGE_WIDTH_PX,
+    height: ERD_EXPORT_PAGE_HEIGHT_PX,
+    pixelRatio: ERD_EXPORT_PIXEL_RATIO,
+    backgroundColor,
+    style: {
+      width: `${ERD_EXPORT_PAGE_WIDTH_PX}px`,
+      height: `${ERD_EXPORT_PAGE_HEIGHT_PX}px`,
+      transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
+    },
+  };
+}
+
+export function shouldIncludeErdExportNode(node: HTMLElement): boolean {
+  const classList = node.classList;
+  return !(
+    classList.contains("react-flow__minimap") ||
+    classList.contains("react-flow__controls") ||
+    classList.contains("react-flow__panel")
+  );
+}
+
+export function assertNonEmptyDataUrl(dataUrl: string, pageIndex: number): void {
+  if (dataUrl.length < ERD_EXPORT_MIN_DATA_URL_LENGTH) {
+    throw new Error(`Export produced an empty image for page ${pageIndex + 1}. Try again or filter tables.`);
+  }
 }
 
 export type CaptureErdTilesInput = {
   tiles: ErdExportRect[];
   viewportElement: HTMLElement;
-  getViewport: () => { x: number; y: number; zoom: number };
-  setViewport: (viewport: { x: number; y: number; zoom: number }) => void;
+  backgroundColor?: string;
   onProgress?: (current: number, total: number) => void;
 };
 
 export async function captureErdTiles(input: CaptureErdTilesInput): Promise<string[]> {
-  const { tiles, viewportElement, getViewport, setViewport, onProgress } = input;
-  const originalViewport = getViewport();
+  const { tiles, viewportElement, onProgress } = input;
+  const backgroundColor = input.backgroundColor ?? getErdExportBackgroundColor();
   const images: string[] = [];
+
+  document.documentElement.setAttribute("data-erd-export", "");
 
   try {
     for (let index = 0; index < tiles.length; index += 1) {
-      const tile = tiles[index];
-      const viewport = getViewportForBounds(
-        tile,
-        ERD_EXPORT_PAGE_WIDTH_PX,
-        ERD_EXPORT_PAGE_HEIGHT_PX,
-        0.05,
-        2,
-        ERD_EXPORT_PADDING_PX,
-      );
-      setViewport(viewport);
-      await nextFrame();
+      const captureOptions = buildErdCaptureOptions(tiles[index], backgroundColor);
       onProgress?.(index + 1, tiles.length);
 
       const dataUrl = await toPng(viewportElement, {
-        pixelRatio: ERD_EXPORT_PIXEL_RATIO,
+        width: captureOptions.width,
+        height: captureOptions.height,
+        pixelRatio: captureOptions.pixelRatio,
+        backgroundColor: captureOptions.backgroundColor,
         cacheBust: true,
-        skipFonts: true,
+        style: captureOptions.style,
+        filter: (node) => {
+          if (!(node instanceof HTMLElement)) return true;
+          return shouldIncludeErdExportNode(node);
+        },
       });
+
+      assertNonEmptyDataUrl(dataUrl, index);
       images.push(dataUrl);
     }
   } finally {
-    setViewport(originalViewport);
-    await nextFrame();
+    document.documentElement.removeAttribute("data-erd-export");
   }
 
   return images;
@@ -214,17 +293,16 @@ async function dataUrlToBlob(dataUrl: string): Promise<Blob> {
 
 export type ExportErdDiagramInput = {
   nodes: Node<ErdTableNodeData>[];
-  bounds: ErdExportRect;
   viewportElement: HTMLElement;
-  getViewport: () => { x: number; y: number; zoom: number };
-  setViewport: (viewport: { x: number; y: number; zoom: number }) => void;
   baseName: string;
   format: "png" | "pdf";
+  backgroundColor?: string;
   onProgress?: (current: number, total: number) => void;
 };
 
 export async function exportErdDiagram(input: ExportErdDiagramInput): Promise<ErdExportBuildResult> {
-  const tiles = computeErdExportTiles(input.bounds);
+  const bounds = resolveErdNodesBounds(input.nodes);
+  const tiles = computeErdExportTiles(bounds);
   if (tiles.length > ERD_EXPORT_MAX_PAGES) {
     throw new Error(
       `Diagram requires ${tiles.length} pages. Filter tables to stay within ${ERD_EXPORT_MAX_PAGES} pages.`,
@@ -234,8 +312,7 @@ export async function exportErdDiagram(input: ExportErdDiagramInput): Promise<Er
   const images = await captureErdTiles({
     tiles,
     viewportElement: input.viewportElement,
-    getViewport: input.getViewport,
-    setViewport: input.setViewport,
+    backgroundColor: input.backgroundColor,
     onProgress: input.onProgress,
   });
 
