@@ -113,64 +113,67 @@ export function Workspace() {
     }
   }, [hasOpenTab, setLastQueryError, setLastResult, setResultsView]);
 
-  const runQuery = useCallback(() => {
-    if (!hasOpenTab) return;
-    const sql = draftSql.trim();
-    if (!sql) {
-      showValidationError("SQL is empty");
-      return;
-    }
-    const connectionId = selectedConnection?.connectionId;
-    if (!connectionId) {
-      showValidationError("Select a database connection in the sidebar");
-      return;
-    }
+  const runQuery = useCallback(
+    (statementSql?: string) => {
+      if (!hasOpenTab) return;
+      const sql = (statementSql ?? draftSql).trim();
+      if (!sql) {
+        showValidationError("SQL is empty");
+        return;
+      }
+      const connectionId = selectedConnection?.connectionId;
+      if (!connectionId) {
+        showValidationError("Select a database connection in the sidebar");
+        return;
+      }
 
-    clearResultFilters();
+      clearResultFilters();
 
-    executeMutation.mutate(
-      { sql, connection_id: connectionId },
-      {
-        onSuccess: (data) => {
-          setLastQueryContext(sql, connectionId);
-          setLastResult({ ...data, loadingMore: false, loadingFilter: false });
-          pushHistory({
-            sql,
-            env,
-            ranAt: new Date().toISOString(),
-            rowCount: data.rowCount,
-            durationMs: data.durationMs,
-          });
-          showQueryResultToast({
-            rowCount: data.rowCount,
-            durationMs: data.durationMs,
-            cached: data.cached,
-          });
-        },
-        onError: (err) => {
-          const message =
-            err instanceof ApiError
-              ? err.message
-              : err instanceof Error
+      executeMutation.mutate(
+        { sql, connection_id: connectionId },
+        {
+          onSuccess: (data) => {
+            setLastQueryContext(sql, connectionId);
+            setLastResult({ ...data, loadingMore: false, loadingFilter: false });
+            pushHistory({
+              sql,
+              env,
+              ranAt: new Date().toISOString(),
+              rowCount: data.rowCount,
+              durationMs: data.durationMs,
+            });
+            showQueryResultToast({
+              rowCount: data.rowCount,
+              durationMs: data.durationMs,
+              cached: data.cached,
+            });
+          },
+          onError: (err) => {
+            const message =
+              err instanceof ApiError
                 ? err.message
-                : "Query failed";
-          setLastQueryError(message);
-          showQueryErrorToast(message);
+                : err instanceof Error
+                  ? err.message
+                  : "Query failed";
+            setLastQueryError(message);
+            showQueryErrorToast(message);
+          },
         },
-      },
-    );
-  }, [
-    draftSql,
-    selectedConnection?.connectionId,
-    executeMutation,
-    pushHistory,
-    setLastQueryContext,
-    setLastQueryError,
-    setLastResult,
-    env,
-    hasOpenTab,
-    clearResultFilters,
-  ]);
+      );
+    },
+    [
+      draftSql,
+      selectedConnection?.connectionId,
+      executeMutation,
+      pushHistory,
+      setLastQueryContext,
+      setLastQueryError,
+      setLastResult,
+      env,
+      hasOpenTab,
+      clearResultFilters,
+    ],
+  );
 
   const fetchWithFilters = useCallback(
     (filters: ResultColumnFilter[], options?: { append?: boolean }) => {
@@ -544,7 +547,7 @@ export function Workspace() {
             <button
               type="button"
               disabled={!hasOpenTab || executeMutation.isPending}
-              onClick={runQuery}
+              onClick={() => runQuery()}
               aria-label="Run query"
               title={`Run query (${formatShortcut("Enter")})`}
               className="flex items-center gap-1.5 h-8 px-2 sm:px-3 rounded-md bg-electric text-primary-foreground text-xs font-semibold hover:brightness-110 transition-all glow-electric disabled:opacity-60 shrink-0 whitespace-nowrap"

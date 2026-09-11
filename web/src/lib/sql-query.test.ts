@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import { DEFAULT_QUERY_LIMIT } from "@/lib/api/query-config";
 import {
+  getStatementAtCursor,
   hasExplicitLimit,
   isReadQuery,
   nextQueryOffset,
@@ -71,6 +72,67 @@ describe("shouldAutoLimit", () => {
 
   it("does not apply default limit for mutations", () => {
     expect(shouldAutoLimit("DELETE FROM users")).toBe(false);
+  });
+});
+
+describe("getStatementAtCursor", () => {
+  const twoStatements =
+    "select distinct type from employee_dropdown_options;\n\nselect * from employee_dropdown_options\nwhere type = 'Eselon';";
+
+  it("returns the first statement when cursor is inside it", () => {
+    expect(getStatementAtCursor(twoStatements, 10)).toBe(
+      "select distinct type from employee_dropdown_options",
+    );
+  });
+
+  it("returns the second statement when cursor is inside it", () => {
+    const cursor = twoStatements.indexOf("where");
+    expect(getStatementAtCursor(twoStatements, cursor)).toBe(
+      "select * from employee_dropdown_options\nwhere type = 'Eselon'",
+    );
+  });
+
+  it("resolves cursor in blank space right after a semicolon to the following statement", () => {
+    const cursor = twoStatements.indexOf("\n\n") + 1;
+    expect(getStatementAtCursor(twoStatements, cursor)).toBe(
+      "select * from employee_dropdown_options\nwhere type = 'Eselon'",
+    );
+  });
+
+  it("ignores semicolons inside string literals", () => {
+    const sql = "select * from t where type = 'A;B'";
+    expect(getStatementAtCursor(sql, 5)).toBe(sql);
+  });
+
+  it("ignores semicolons inside comments", () => {
+    const sql = "select * from t -- comment; with semicolon\nwhere id = 1";
+    expect(getStatementAtCursor(sql, 5)).toBe(sql);
+  });
+
+  it("returns whole trimmed text for a single statement with no semicolon", () => {
+    expect(getStatementAtCursor("SELECT * FROM users", 3)).toBe("SELECT * FROM users");
+  });
+
+  it("returns whole trimmed statement for a single statement with a trailing semicolon", () => {
+    expect(getStatementAtCursor("SELECT * FROM users;", 3)).toBe("SELECT * FROM users");
+  });
+
+  it("handles cursor at the very start of the document", () => {
+    expect(getStatementAtCursor(twoStatements, 0)).toBe(
+      "select distinct type from employee_dropdown_options",
+    );
+  });
+
+  it("handles cursor at the very end of the document", () => {
+    expect(getStatementAtCursor(twoStatements, twoStatements.length)).toBe(
+      "select * from employee_dropdown_options\nwhere type = 'Eselon'",
+    );
+  });
+
+  it("handles empty statements between consecutive semicolons", () => {
+    const sql = "SELECT 1;;SELECT 2;";
+    const cursor = sql.indexOf(";;") + 2;
+    expect(getStatementAtCursor(sql, cursor)).toBe("SELECT 1");
   });
 });
 

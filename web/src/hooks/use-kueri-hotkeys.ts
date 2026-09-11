@@ -39,6 +39,10 @@ export function useKueriHotkeys(handlers: KueriHotkeyHandlers) {
       const mod = isModKey(e);
 
       if (mod && e.key === "Enter") {
+        // When focus is inside the SQL editor, its own CodeMirror keymap already
+        // handles Mod-Enter with cursor-aware statement selection — running it here
+        // too would re-run using the whole buffer instead of just the current statement.
+        if (isInSqlEditor(e.target)) return;
         e.preventDefault();
         h.onRun();
         return;

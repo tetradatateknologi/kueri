@@ -15,7 +15,7 @@ type EditorResultsStackProps = {
   hasOpenTab: boolean;
   draftSql: string;
   setDraftSql: (sql: string) => void;
-  runQuery: () => void;
+  runQuery: (statementSql: string) => void;
   activeTabId: string | null;
   activeScriptId: number | null;
   openEditScript: (id: number) => void;
