@@ -4,11 +4,7 @@ import JSZip from "jszip";
 import type { Node } from "@xyflow/react";
 import { getNodesBounds, getViewportForBounds } from "@xyflow/react";
 
-import {
-  ERD_NODE_WIDTH,
-  estimateTableNodeHeight,
-  type ErdTableNodeData,
-} from "@/lib/schema-erd";
+import { ERD_NODE_WIDTH, estimateTableNodeHeight, type ErdTableNodeData } from "@/lib/schema-erd";
 
 export const ERD_EXPORT_PAGE_WIDTH_PX = 1920;
 export const ERD_EXPORT_PAGE_HEIGHT_PX = 1080;
@@ -99,7 +95,10 @@ export function computeErdExportTiles(
   const stepX = tileFlowWidth * (1 - overlapRatio);
   const stepY = tileFlowHeight * (1 - overlapRatio);
   const cols = Math.max(1, Math.ceil((paddedBounds.width - tileFlowWidth * overlapRatio) / stepX));
-  const rows = Math.max(1, Math.ceil((paddedBounds.height - tileFlowHeight * overlapRatio) / stepY));
+  const rows = Math.max(
+    1,
+    Math.ceil((paddedBounds.height - tileFlowHeight * overlapRatio) / stepY),
+  );
 
   const tiles: ErdExportRect[] = [];
   for (let row = 0; row < rows; row += 1) {
@@ -123,6 +122,28 @@ export function estimateExportPageCount(
   return computeErdExportTiles(bounds, options).length;
 }
 
+/** getViewportForBounds expects padding as a fraction (0–1), not pixels. */
+export function toViewportPaddingFraction(paddingPx: number, pageWidthPx: number): number {
+  return paddingPx / pageWidthPx;
+}
+
+export function resolveCaptureDimensions(
+  tile: ErdExportRect,
+  isSinglePage: boolean,
+): { width: number; height: number } {
+  if (isSinglePage) {
+    return {
+      width: Math.ceil(tile.width),
+      height: Math.ceil(tile.height),
+    };
+  }
+
+  return {
+    width: ERD_EXPORT_PAGE_WIDTH_PX,
+    height: ERD_EXPORT_PAGE_HEIGHT_PX,
+  };
+}
+
 export type ErdCaptureOptions = {
   width: number;
   height: number;
@@ -135,30 +156,38 @@ export type ErdCaptureOptions = {
   };
 };
 
+export type BuildErdCaptureOptionsParams = {
+  outputWidth: number;
+  outputHeight: number;
+  backgroundColor?: string;
+};
+
 export function buildErdCaptureOptions(
   tile: ErdExportRect,
-  backgroundColor: string = getErdExportBackgroundColor(),
+  params: BuildErdCaptureOptionsParams,
 ): ErdCaptureOptions {
-  const viewport = getViewportForBounds(
-    tile,
-    ERD_EXPORT_PAGE_WIDTH_PX,
-    ERD_EXPORT_PAGE_HEIGHT_PX,
-    0.05,
-    2,
-    ERD_EXPORT_PADDING_PX,
-  );
+  const { outputWidth, outputHeight } = params;
+  const backgroundColor = params.backgroundColor ?? getErdExportBackgroundColor();
+  const paddingFraction = toViewportPaddingFraction(ERD_EXPORT_PADDING_PX, outputWidth);
+
+  const viewport = getViewportForBounds(tile, outputWidth, outputHeight, 0.05, 2, paddingFraction);
 
   return {
-    width: ERD_EXPORT_PAGE_WIDTH_PX,
-    height: ERD_EXPORT_PAGE_HEIGHT_PX,
+    width: outputWidth,
+    height: outputHeight,
     pixelRatio: ERD_EXPORT_PIXEL_RATIO,
     backgroundColor,
     style: {
-      width: `${ERD_EXPORT_PAGE_WIDTH_PX}px`,
-      height: `${ERD_EXPORT_PAGE_HEIGHT_PX}px`,
+      width: `${outputWidth}px`,
+      height: `${outputHeight}px`,
       transform: `translate(${viewport.x}px, ${viewport.y}px) scale(${viewport.zoom})`,
     },
   };
+}
+
+export function parseCaptureTransformZoom(transform: string): number {
+  const match = transform.match(/scale\(([^)]+)\)/);
+  return match ? Number.parseFloat(match[1]) : 0;
 }
 
 export function shouldIncludeErdExportNode(node: HTMLElement): boolean {
@@ -172,9 +201,17 @@ export function shouldIncludeErdExportNode(node: HTMLElement): boolean {
 
 export function assertNonEmptyDataUrl(dataUrl: string, pageIndex: number): void {
   if (dataUrl.length < ERD_EXPORT_MIN_DATA_URL_LENGTH) {
-    throw new Error(`Export produced an empty image for page ${pageIndex + 1}. Try again or filter tables.`);
+    throw new Error(
+      `Export produced an empty image for page ${pageIndex + 1}. Try again or filter tables.`,
+    );
   }
 }
+
+export type CapturedErdImage = {
+  dataUrl: string;
+  width: number;
+  height: number;
+};
 
 export type CaptureErdTilesInput = {
   tiles: ErdExportRect[];
@@ -183,16 +220,23 @@ export type CaptureErdTilesInput = {
   onProgress?: (current: number, total: number) => void;
 };
 
-export async function captureErdTiles(input: CaptureErdTilesInput): Promise<string[]> {
+export async function captureErdTiles(input: CaptureErdTilesInput): Promise<CapturedErdImage[]> {
   const { tiles, viewportElement, onProgress } = input;
   const backgroundColor = input.backgroundColor ?? getErdExportBackgroundColor();
-  const images: string[] = [];
+  const isSinglePage = tiles.length === 1;
+  const images: CapturedErdImage[] = [];
 
   document.documentElement.setAttribute("data-erd-export", "");
 
   try {
     for (let index = 0; index < tiles.length; index += 1) {
-      const captureOptions = buildErdCaptureOptions(tiles[index], backgroundColor);
+      const tile = tiles[index];
+      const { width, height } = resolveCaptureDimensions(tile, isSinglePage);
+      const captureOptions = buildErdCaptureOptions(tile, {
+        outputWidth: width,
+        outputHeight: height,
+        backgroundColor,
+      });
       onProgress?.(index + 1, tiles.length);
 
       const dataUrl = await toPng(viewportElement, {
@@ -209,7 +253,7 @@ export async function captureErdTiles(input: CaptureErdTilesInput): Promise<stri
       });
 
       assertNonEmptyDataUrl(dataUrl, index);
-      images.push(dataUrl);
+      images.push({ dataUrl, width, height });
     }
   } finally {
     document.documentElement.removeAttribute("data-erd-export");
@@ -252,30 +296,23 @@ export async function buildPngExport(
 }
 
 export async function buildPdfExport(
-  images: string[],
+  images: CapturedErdImage[],
   baseName: string,
 ): Promise<ErdExportBuildResult> {
+  const firstPage = images[0];
   const pdf = new jsPDF({
-    orientation: "landscape",
+    orientation: firstPage.width >= firstPage.height ? "landscape" : "portrait",
     unit: "px",
-    format: [ERD_EXPORT_PAGE_WIDTH_PX, ERD_EXPORT_PAGE_HEIGHT_PX],
+    format: [firstPage.width, firstPage.height],
     compress: true,
   });
 
   for (let index = 0; index < images.length; index += 1) {
+    const page = images[index];
     if (index > 0) {
-      pdf.addPage([ERD_EXPORT_PAGE_WIDTH_PX, ERD_EXPORT_PAGE_HEIGHT_PX], "landscape");
+      pdf.addPage([page.width, page.height], page.width >= page.height ? "landscape" : "portrait");
     }
-    pdf.addImage(
-      images[index],
-      "PNG",
-      0,
-      0,
-      ERD_EXPORT_PAGE_WIDTH_PX,
-      ERD_EXPORT_PAGE_HEIGHT_PX,
-      undefined,
-      "FAST",
-    );
+    pdf.addImage(page.dataUrl, "PNG", 0, 0, page.width, page.height, undefined, "FAST");
   }
 
   const blob = pdf.output("blob");
@@ -300,7 +337,9 @@ export type ExportErdDiagramInput = {
   onProgress?: (current: number, total: number) => void;
 };
 
-export async function exportErdDiagram(input: ExportErdDiagramInput): Promise<ErdExportBuildResult> {
+export async function exportErdDiagram(
+  input: ExportErdDiagramInput,
+): Promise<ErdExportBuildResult> {
   const bounds = resolveErdNodesBounds(input.nodes);
   const tiles = computeErdExportTiles(bounds);
   if (tiles.length > ERD_EXPORT_MAX_PAGES) {
@@ -309,7 +348,7 @@ export async function exportErdDiagram(input: ExportErdDiagramInput): Promise<Er
     );
   }
 
-  const images = await captureErdTiles({
+  const capturedImages = await captureErdTiles({
     tiles,
     viewportElement: input.viewportElement,
     backgroundColor: input.backgroundColor,
@@ -317,7 +356,10 @@ export async function exportErdDiagram(input: ExportErdDiagramInput): Promise<Er
   });
 
   if (input.format === "png") {
-    return buildPngExport(images, input.baseName);
+    return buildPngExport(
+      capturedImages.map((image) => image.dataUrl),
+      input.baseName,
+    );
   }
-  return buildPdfExport(images, input.baseName);
+  return buildPdfExport(capturedImages, input.baseName);
 }

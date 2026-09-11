@@ -14,8 +14,11 @@ import {
   ERD_EXPORT_PADDING_PX,
   ERD_EXPORT_ZOOM,
   estimateExportPageCount,
+  parseCaptureTransformZoom,
+  resolveCaptureDimensions,
   resolveErdNodesBounds,
   shouldIncludeErdExportNode,
+  toViewportPaddingFraction,
 } from "./erd-export";
 
 const sampleTable = {
@@ -74,15 +77,57 @@ describe("enrichErdNodesForBounds", () => {
   });
 });
 
+describe("toViewportPaddingFraction", () => {
+  it("converts pixel padding to a viewport fraction", () => {
+    expect(toViewportPaddingFraction(48, 1920)).toBeCloseTo(0.025);
+  });
+});
+
+describe("resolveCaptureDimensions", () => {
+  it("uses tile dimensions for single-page export", () => {
+    expect(resolveCaptureDimensions({ x: 0, y: 0, width: 400.2, height: 300.7 }, true)).toEqual({
+      width: 401,
+      height: 301,
+    });
+  });
+
+  it("uses fixed page dimensions for multi-page export", () => {
+    expect(resolveCaptureDimensions({ x: 0, y: 0, width: 400, height: 300 }, false)).toEqual({
+      width: ERD_EXPORT_PAGE_WIDTH_PX,
+      height: ERD_EXPORT_PAGE_HEIGHT_PX,
+    });
+  });
+});
+
 describe("buildErdCaptureOptions", () => {
-  it("returns export dimensions and transform style", () => {
-    const options = buildErdCaptureOptions({ x: 0, y: 0, width: 400, height: 300 }, "#ffffff");
+  it("returns fit-to-content dimensions and a readable zoom for single-page tiles", () => {
+    const tile = { x: 0, y: 0, width: 400, height: 300 };
+    const options = buildErdCaptureOptions(tile, {
+      outputWidth: 400,
+      outputHeight: 300,
+      backgroundColor: "#ffffff",
+    });
+
+    expect(options.width).toBe(400);
+    expect(options.height).toBe(300);
+    expect(options.backgroundColor).toBe("#ffffff");
+    expect(options.style.width).toBe("400px");
+    expect(options.style.height).toBe("300px");
+    expect(parseCaptureTransformZoom(options.style.transform)).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it("uses fixed page dimensions for multi-page tiles", () => {
+    const options = buildErdCaptureOptions(
+      { x: 0, y: 0, width: 1800, height: 900 },
+      {
+        outputWidth: ERD_EXPORT_PAGE_WIDTH_PX,
+        outputHeight: ERD_EXPORT_PAGE_HEIGHT_PX,
+      },
+    );
+
     expect(options.width).toBe(ERD_EXPORT_PAGE_WIDTH_PX);
     expect(options.height).toBe(ERD_EXPORT_PAGE_HEIGHT_PX);
-    expect(options.backgroundColor).toBe("#ffffff");
-    expect(options.style.width).toBe(`${ERD_EXPORT_PAGE_WIDTH_PX}px`);
-    expect(options.style.height).toBe(`${ERD_EXPORT_PAGE_HEIGHT_PX}px`);
-    expect(options.style.transform).toMatch(/^translate\(.+\) scale\(.+\)$/);
+    expect(parseCaptureTransformZoom(options.style.transform)).toBeGreaterThanOrEqual(0.5);
   });
 });
 
@@ -157,9 +202,9 @@ describe("estimateExportPageCount", () => {
 describe("captureErdTiles", () => {
   it("passes width, height, and transform style to toPng", async () => {
     const htmlToImage = await import("html-to-image");
-    const toPngSpy = vi.spyOn(htmlToImage, "toPng").mockResolvedValue(
-      `data:image/png;base64,${"x".repeat(ERD_EXPORT_MIN_DATA_URL_LENGTH)}`,
-    );
+    const toPngSpy = vi
+      .spyOn(htmlToImage, "toPng")
+      .mockResolvedValue(`data:image/png;base64,${"x".repeat(ERD_EXPORT_MIN_DATA_URL_LENGTH)}`);
     const { captureErdTiles } = await import("./erd-export");
 
     const viewportElement = document.createElement("div");
@@ -173,12 +218,12 @@ describe("captureErdTiles", () => {
     expect(toPngSpy).toHaveBeenCalledWith(
       viewportElement,
       expect.objectContaining({
-        width: ERD_EXPORT_PAGE_WIDTH_PX,
-        height: ERD_EXPORT_PAGE_HEIGHT_PX,
+        width: 400,
+        height: 300,
         backgroundColor: "#ffffff",
         style: expect.objectContaining({
-          width: `${ERD_EXPORT_PAGE_WIDTH_PX}px`,
-          height: `${ERD_EXPORT_PAGE_HEIGHT_PX}px`,
+          width: "400px",
+          height: "300px",
           transform: expect.stringMatching(/^translate\(/),
         }),
       }),
