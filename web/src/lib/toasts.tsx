@@ -38,6 +38,15 @@ export function showExportToast(params: { filename: string; rowCount?: number })
   showCustomToast((onDismiss) => <ExportToast {...params} onDismiss={onDismiss} />);
 }
 
+export function showErdExportToast(params: {
+  filename: string;
+  format: "png" | "pdf";
+  pageCount: number;
+}) {
+  const label = params.format === "png" ? "PNG" : "PDF";
+  showSuccess(`Exported ERD as ${label} (${params.pageCount} page${params.pageCount === 1 ? "" : "s"}): ${params.filename}`);
+}
+
 export function showValidationError(message: string) {
   showQueryErrorToast(message, "Action blocked");
 }

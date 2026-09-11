@@ -35,7 +35,9 @@ import {
   Wand2,
 } from "lucide-react";
 
+import { ErdExportMenu } from "@/components/kueri/ErdExportMenu";
 import { ErdTableNode } from "@/components/kueri/ErdTableNode";
+import { useKueriApp } from "@/context/kueri-app";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -71,6 +73,7 @@ import {
   type ErdTableNodeData,
 } from "@/lib/schema-erd";
 import { cn } from "@/lib/utils";
+import { useWorkspaceStore, type WorkspaceEnv } from "@/stores/workspace-store";
 
 const nodeTypes = { erdTable: ErdTableNode };
 
@@ -333,14 +336,24 @@ function ErdToolButton({
   );
 }
 
+type ErdExportContext = {
+  canvasContainerRef: MutableRefObject<HTMLDivElement | null>;
+  projectName: string;
+  env: WorkspaceEnv;
+  userSlug: string;
+  onExportProgress: (progress: { current: number; total: number } | null) => void;
+};
+
 function ErdToolbar({
   erd,
   layout,
   onExpand,
+  exportContext,
 }: {
   erd: ErdCanvasState;
   layout: ErdLayout;
   onExpand?: () => void;
+  exportContext: ErdExportContext;
 }) {
   return (
     <TooltipProvider delayDuration={300}>
@@ -375,6 +388,16 @@ function ErdToolbar({
             <Expand className="size-3.5" />
           </ErdToolButton>
         )}
+        <ErdExportMenu
+          nodes={erd.nodes}
+          visibleTableCount={erd.visibleTables.length}
+          canvasContainerRef={exportContext.canvasContainerRef}
+          projectName={exportContext.projectName}
+          env={exportContext.env}
+          userSlug={exportContext.userSlug}
+          disabled={erd.nodes.length === 0 || !erd.layoutReady}
+          onExportProgress={exportContext.onExportProgress}
+        />
         <ErdToolButton
           label="Refresh ERD metadata"
           onClick={erd.handleRefresh}
@@ -531,14 +554,18 @@ function ErdTableList({
 function ErdFlowCanvas({
   erd,
   fitViewRef,
+  canvasContainerRef,
+  exportProgress,
   syncViewport = false,
 }: {
   erd: ErdCanvasState;
   fitViewRef: MutableRefObject<FitViewFn | null>;
+  canvasContainerRef: MutableRefObject<HTMLDivElement | null>;
+  exportProgress: { current: number; total: number } | null;
   syncViewport?: boolean;
 }) {
   const { fitView } = useReactFlow();
-  const containerRef = useRef<HTMLDivElement>(null);
+  const containerRef = canvasContainerRef;
 
   useEffect(() => {
     fitViewRef.current = fitView;
@@ -639,6 +666,14 @@ function ErdFlowCanvas({
               No foreign key relationships found. Tables are shown without relationship lines.
             </p>
           )}
+          {exportProgress && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
+              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-surface-1 px-3 py-2 text-xs text-muted-foreground">
+                <Loader2 className="size-4 animate-spin text-electric" />
+                Exporting page {exportProgress.current} of {exportProgress.total}…
+              </div>
+            </div>
+          )}
         </>
       )}
     </div>
@@ -650,11 +685,15 @@ function ErdPanelLayout({
   layout,
   onExpand,
   fitViewRef,
+  exportContext,
+  exportProgress,
 }: {
   erd: ErdCanvasState;
   layout: ErdLayout;
   onExpand?: () => void;
   fitViewRef: MutableRefObject<FitViewFn | null>;
+  exportContext: ErdExportContext;
+  exportProgress: { current: number; total: number } | null;
 }) {
   const [filtersOpen, setFiltersOpen] = useState(layout === "expanded");
   const syncViewport = layout === "expanded";
@@ -662,10 +701,15 @@ function ErdPanelLayout({
   if (layout === "compact") {
     return (
       <div className="flex h-full min-h-0 min-w-0 flex-col overflow-hidden">
-        <ErdToolbar erd={erd} layout="compact" onExpand={onExpand} />
+        <ErdToolbar erd={erd} layout="compact" onExpand={onExpand} exportContext={exportContext} />
         <ErdFilters erd={erd} className="border-b border-border/60" />
         <ErdTableList erd={erd} />
-        <ErdFlowCanvas erd={erd} fitViewRef={fitViewRef} />
+        <ErdFlowCanvas
+          erd={erd}
+          fitViewRef={fitViewRef}
+          canvasContainerRef={exportContext.canvasContainerRef}
+          exportProgress={exportProgress}
+        />
       </div>
     );
   }
@@ -697,8 +741,14 @@ function ErdPanelLayout({
           </aside>
         )}
         <div className="flex flex-1 min-h-0 min-w-0 h-full flex-col overflow-hidden">
-          <ErdToolbar erd={erd} layout="expanded" />
-          <ErdFlowCanvas erd={erd} fitViewRef={fitViewRef} syncViewport={syncViewport} />
+          <ErdToolbar erd={erd} layout="expanded" exportContext={exportContext} />
+          <ErdFlowCanvas
+            erd={erd}
+            fitViewRef={fitViewRef}
+            canvasContainerRef={exportContext.canvasContainerRef}
+            exportProgress={exportProgress}
+            syncViewport={syncViewport}
+          />
         </div>
       </div>
     </div>
@@ -713,9 +763,28 @@ function ErdPanelInner({
   connectionLabel?: string;
 }) {
   const fitViewRef = useRef<FitViewFn | null>(null);
+  const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const erd = useErdCanvas(connectionId, fitViewRef);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenFlowReady, setFullscreenFlowReady] = useState(false);
+  const [exportProgress, setExportProgress] = useState<{ current: number; total: number } | null>(
+    null,
+  );
+  const { me } = useKueriApp();
+  const env = useWorkspaceStore((s) => s.env);
+  const selectedConnection = useWorkspaceStore((s) => s.selectedConnection);
+  const projectName = selectedConnection?.projectName ?? "kueri";
+  const userSlug = (me?.email ?? "user").split("@")[0] ?? "user";
+  const exportContext = useMemo(
+    () => ({
+      canvasContainerRef,
+      projectName,
+      env,
+      userSlug,
+      onExportProgress: setExportProgress,
+    }),
+    [env, projectName, userSlug],
+  );
 
   useEffect(() => {
     setFullscreenOpen(false);
@@ -755,6 +824,8 @@ function ErdPanelInner({
             erd={erd}
             layout="compact"
             fitViewRef={fitViewRef}
+            exportContext={exportContext}
+            exportProgress={exportProgress}
             onExpand={() => setFullscreenOpen(true)}
           />
         )}
@@ -772,7 +843,13 @@ function ErdPanelInner({
           </DialogHeader>
           <div className="flex flex-1 min-h-0 min-w-0 h-full overflow-hidden">
             {fullscreenFlowReady ? (
-              <ErdPanelLayout erd={erd} layout="expanded" fitViewRef={fitViewRef} />
+              <ErdPanelLayout
+                erd={erd}
+                layout="expanded"
+                fitViewRef={fitViewRef}
+                exportContext={exportContext}
+                exportProgress={exportProgress}
+              />
             ) : (
               <div className="flex flex-1 items-center justify-center gap-2 text-xs text-muted-foreground">
                 <Loader2 className="size-4 animate-spin text-electric" />
