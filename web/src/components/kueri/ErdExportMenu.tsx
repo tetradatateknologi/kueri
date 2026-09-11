@@ -1,4 +1,4 @@
-import { useState, type MutableRefObject } from "react";
+import { useEffect, useRef, useState, type MutableRefObject } from "react";
 import type { Node } from "@xyflow/react";
 import { Download, FileImage, FileText, Loader2 } from "lucide-react";
 
@@ -25,15 +25,24 @@ import {
 } from "@/components/ui/tooltip";
 import {
   ERD_EXPORT_MAX_PAGES,
+  ERD_EXPORT_PIXEL_RATIO,
+  ERD_EXPORT_PIXEL_RATIO_REDUCED,
   ERD_EXPORT_WARN_TABLES,
+  ErdExportAbortedError,
   estimateExportPageCount,
   exportErdDiagram,
   getErdExportBackgroundColor,
+  resolveAdaptivePixelRatio,
   resolveErdNodesBounds,
 } from "@/lib/erd-export";
 import { downloadBlob, formatErdExportFilename } from "@/lib/export-utils";
 import type { ErdTableNodeData } from "@/lib/schema-erd";
-import { showErdExportToast, showQueryErrorToast, showValidationError } from "@/lib/toasts";
+import {
+  showErdExportToast,
+  showExportCancelledToast,
+  showQueryErrorToast,
+  showValidationError,
+} from "@/lib/toasts";
 import type { WorkspaceEnv } from "@/stores/workspace-store";
 import { cn } from "@/lib/utils";
 
@@ -46,6 +55,7 @@ type ErdExportMenuProps = {
   nodes: Node<ErdTableNodeData>[];
   visibleTableCount: number;
   canvasContainerRef: MutableRefObject<HTMLDivElement | null>;
+  cancelExportRef?: MutableRefObject<(() => void) | null>;
   projectName: string;
   env: WorkspaceEnv;
   userSlug: string;
@@ -57,6 +67,7 @@ export function ErdExportMenu({
   nodes,
   visibleTableCount,
   canvasContainerRef,
+  cancelExportRef,
   projectName,
   env,
   userSlug,
@@ -66,6 +77,20 @@ export function ErdExportMenu({
   const [exporting, setExporting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingFormat, setPendingFormat] = useState<"png" | "pdf" | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  const confirmPageCount = estimateExportPageCount(resolveErdNodesBounds(nodes));
+  const confirmPixelRatio = resolveAdaptivePixelRatio(visibleTableCount, confirmPageCount);
+  const usesReducedQuality = confirmPixelRatio === ERD_EXPORT_PIXEL_RATIO_REDUCED;
+
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort();
+      if (cancelExportRef) {
+        cancelExportRef.current = null;
+      }
+    };
+  }, [cancelExportRef]);
 
   const runExport = async (format: "png" | "pdf") => {
     if (nodes.length === 0) {
@@ -96,6 +121,12 @@ export function ErdExportMenu({
       user: userSlug,
     });
 
+    const abortController = new AbortController();
+    abortControllerRef.current = abortController;
+    if (cancelExportRef) {
+      cancelExportRef.current = () => abortController.abort();
+    }
+
     setExporting(true);
     onExportProgress({ current: 0, total: pageCount });
 
@@ -105,7 +136,9 @@ export function ErdExportMenu({
         viewportElement,
         baseName,
         format,
+        tableCount: visibleTableCount,
         backgroundColor: getErdExportBackgroundColor(),
+        signal: abortController.signal,
         onProgress: (current, total) => onExportProgress({ current, total }),
       });
 
@@ -116,9 +149,17 @@ export function ErdExportMenu({
         pageCount: result.pageCount,
       });
     } catch (error) {
+      if (error instanceof ErdExportAbortedError) {
+        showExportCancelledToast();
+        return;
+      }
       const message = error instanceof Error ? error.message : "Failed to export ERD";
       showQueryErrorToast(message, "Export failed");
     } finally {
+      abortControllerRef.current = null;
+      if (cancelExportRef) {
+        cancelExportRef.current = null;
+      }
       setExporting(false);
       onExportProgress(null);
     }
@@ -189,9 +230,20 @@ export function ErdExportMenu({
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Export large diagram?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This export includes {visibleTableCount} tables and may take a while. Consider
-              filtering by schema or hiding tables before exporting.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  This export includes {visibleTableCount} tables across approximately{" "}
+                  {confirmPageCount} page{confirmPageCount === 1 ? "" : "s"} and may take a while.
+                  Consider filtering by schema or hiding tables before exporting.
+                </p>
+                {usesReducedQuality && (
+                  <p>
+                    Reduced quality mode will be used (pixel ratio {ERD_EXPORT_PIXEL_RATIO_REDUCED}{" "}
+                    instead of {ERD_EXPORT_PIXEL_RATIO}) to keep the browser responsive.
+                  </p>
+                )}
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

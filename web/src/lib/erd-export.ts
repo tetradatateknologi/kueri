@@ -11,6 +11,8 @@ export const ERD_EXPORT_PAGE_HEIGHT_PX = 1080;
 export const ERD_EXPORT_PADDING_PX = 48;
 export const ERD_EXPORT_OVERLAP_RATIO = 0.1;
 export const ERD_EXPORT_PIXEL_RATIO = 2;
+export const ERD_EXPORT_PIXEL_RATIO_REDUCED = 1;
+export const ERD_EXPORT_ADAPTIVE_PAGE_THRESHOLD = 6;
 export const ERD_EXPORT_MAX_PAGES = 20;
 export const ERD_EXPORT_WARN_TABLES = 50;
 export const ERD_EXPORT_ZOOM = 1;
@@ -41,6 +43,32 @@ export const DEFAULT_ERD_EXPORT_TILE_OPTIONS: ErdExportTileOptions = {
   overlapRatio: ERD_EXPORT_OVERLAP_RATIO,
   zoom: ERD_EXPORT_ZOOM,
 };
+
+export class ErdExportAbortedError extends Error {
+  constructor() {
+    super("Export cancelled");
+    this.name = "ErdExportAbortedError";
+  }
+}
+
+export function yieldToMainThread(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0);
+  });
+}
+
+export function resolveAdaptivePixelRatio(tableCount: number, pageCount: number): number {
+  if (tableCount >= ERD_EXPORT_WARN_TABLES || pageCount >= ERD_EXPORT_ADAPTIVE_PAGE_THRESHOLD) {
+    return ERD_EXPORT_PIXEL_RATIO_REDUCED;
+  }
+  return ERD_EXPORT_PIXEL_RATIO;
+}
+
+function assertNotAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new ErdExportAbortedError();
+  }
+}
 
 export function getErdExportBackgroundColor(): string {
   if (typeof document === "undefined") {
@@ -160,6 +188,7 @@ export type BuildErdCaptureOptionsParams = {
   outputWidth: number;
   outputHeight: number;
   backgroundColor?: string;
+  pixelRatio?: number;
 };
 
 export function buildErdCaptureOptions(
@@ -168,6 +197,7 @@ export function buildErdCaptureOptions(
 ): ErdCaptureOptions {
   const { outputWidth, outputHeight } = params;
   const backgroundColor = params.backgroundColor ?? getErdExportBackgroundColor();
+  const pixelRatio = params.pixelRatio ?? ERD_EXPORT_PIXEL_RATIO;
   const paddingFraction = toViewportPaddingFraction(ERD_EXPORT_PADDING_PX, outputWidth);
 
   const viewport = getViewportForBounds(tile, outputWidth, outputHeight, 0.05, 2, paddingFraction);
@@ -175,7 +205,7 @@ export function buildErdCaptureOptions(
   return {
     width: outputWidth,
     height: outputHeight,
-    pixelRatio: ERD_EXPORT_PIXEL_RATIO,
+    pixelRatio,
     backgroundColor,
     style: {
       width: `${outputWidth}px`,
@@ -217,12 +247,15 @@ export type CaptureErdTilesInput = {
   tiles: ErdExportRect[];
   viewportElement: HTMLElement;
   backgroundColor?: string;
+  pixelRatio?: number;
+  signal?: AbortSignal;
   onProgress?: (current: number, total: number) => void;
 };
 
 export async function captureErdTiles(input: CaptureErdTilesInput): Promise<CapturedErdImage[]> {
-  const { tiles, viewportElement, onProgress } = input;
+  const { tiles, viewportElement, onProgress, signal } = input;
   const backgroundColor = input.backgroundColor ?? getErdExportBackgroundColor();
+  const pixelRatio = input.pixelRatio ?? ERD_EXPORT_PIXEL_RATIO;
   const isSinglePage = tiles.length === 1;
   const images: CapturedErdImage[] = [];
 
@@ -230,21 +263,24 @@ export async function captureErdTiles(input: CaptureErdTilesInput): Promise<Capt
 
   try {
     for (let index = 0; index < tiles.length; index += 1) {
+      assertNotAborted(signal);
+      await yieldToMainThread();
+
       const tile = tiles[index];
       const { width, height } = resolveCaptureDimensions(tile, isSinglePage);
       const captureOptions = buildErdCaptureOptions(tile, {
         outputWidth: width,
         outputHeight: height,
         backgroundColor,
+        pixelRatio,
       });
-      onProgress?.(index + 1, tiles.length);
 
       const dataUrl = await toPng(viewportElement, {
         width: captureOptions.width,
         height: captureOptions.height,
         pixelRatio: captureOptions.pixelRatio,
         backgroundColor: captureOptions.backgroundColor,
-        cacheBust: true,
+        cacheBust: index === 0,
         style: captureOptions.style,
         filter: (node) => {
           if (!(node instanceof HTMLElement)) return true;
@@ -254,6 +290,10 @@ export async function captureErdTiles(input: CaptureErdTilesInput): Promise<Capt
 
       assertNonEmptyDataUrl(dataUrl, index);
       images.push({ dataUrl, width, height });
+
+      onProgress?.(index + 1, tiles.length);
+      await yieldToMainThread();
+      assertNotAborted(signal);
     }
   } finally {
     document.documentElement.removeAttribute("data-erd-export");
@@ -333,7 +373,9 @@ export type ExportErdDiagramInput = {
   viewportElement: HTMLElement;
   baseName: string;
   format: "png" | "pdf";
+  tableCount: number;
   backgroundColor?: string;
+  signal?: AbortSignal;
   onProgress?: (current: number, total: number) => void;
 };
 
@@ -348,10 +390,14 @@ export async function exportErdDiagram(
     );
   }
 
+  const pixelRatio = resolveAdaptivePixelRatio(input.tableCount, tiles.length);
+
   const capturedImages = await captureErdTiles({
     tiles,
     viewportElement: input.viewportElement,
     backgroundColor: input.backgroundColor,
+    pixelRatio,
+    signal: input.signal,
     onProgress: input.onProgress,
   });
 

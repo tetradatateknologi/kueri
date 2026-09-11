@@ -1,24 +1,30 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Node } from "@xyflow/react";
 
 import type { ErdTableNodeData } from "@/lib/schema-erd";
 import {
   assertNonEmptyDataUrl,
   buildErdCaptureOptions,
+  captureErdTiles,
   computeErdExportTiles,
   DEFAULT_ERD_EXPORT_TILE_OPTIONS,
   enrichErdNodesForBounds,
+  ErdExportAbortedError,
   ERD_EXPORT_MIN_DATA_URL_LENGTH,
   ERD_EXPORT_PAGE_HEIGHT_PX,
   ERD_EXPORT_PAGE_WIDTH_PX,
   ERD_EXPORT_PADDING_PX,
+  ERD_EXPORT_PIXEL_RATIO,
+  ERD_EXPORT_PIXEL_RATIO_REDUCED,
   ERD_EXPORT_ZOOM,
   estimateExportPageCount,
   parseCaptureTransformZoom,
+  resolveAdaptivePixelRatio,
   resolveCaptureDimensions,
   resolveErdNodesBounds,
   shouldIncludeErdExportNode,
   toViewportPaddingFraction,
+  yieldToMainThread,
 } from "./erd-export";
 
 const sampleTable = {
@@ -99,6 +105,32 @@ describe("resolveCaptureDimensions", () => {
   });
 });
 
+describe("resolveAdaptivePixelRatio", () => {
+  it("returns full quality for small diagrams", () => {
+    expect(resolveAdaptivePixelRatio(30, 2)).toBe(ERD_EXPORT_PIXEL_RATIO);
+  });
+
+  it("returns reduced quality for large table counts", () => {
+    expect(resolveAdaptivePixelRatio(150, 2)).toBe(ERD_EXPORT_PIXEL_RATIO_REDUCED);
+  });
+
+  it("returns reduced quality for many pages even with fewer tables", () => {
+    expect(resolveAdaptivePixelRatio(40, 8)).toBe(ERD_EXPORT_PIXEL_RATIO_REDUCED);
+  });
+});
+
+describe("yieldToMainThread", () => {
+  it("resolves after yielding to the event loop", async () => {
+    const callback = vi.fn();
+    void yieldToMainThread().then(callback);
+    expect(callback).not.toHaveBeenCalled();
+    await yieldToMainThread();
+    await vi.waitFor(() => {
+      expect(callback).toHaveBeenCalled();
+    });
+  });
+});
+
 describe("buildErdCaptureOptions", () => {
   it("returns fit-to-content dimensions and a readable zoom for single-page tiles", () => {
     const tile = { x: 0, y: 0, width: 400, height: 300 };
@@ -128,6 +160,19 @@ describe("buildErdCaptureOptions", () => {
     expect(options.width).toBe(ERD_EXPORT_PAGE_WIDTH_PX);
     expect(options.height).toBe(ERD_EXPORT_PAGE_HEIGHT_PX);
     expect(parseCaptureTransformZoom(options.style.transform)).toBeGreaterThanOrEqual(0.5);
+  });
+
+  it("uses the provided pixel ratio when specified", () => {
+    const options = buildErdCaptureOptions(
+      { x: 0, y: 0, width: 400, height: 300 },
+      {
+        outputWidth: 400,
+        outputHeight: 300,
+        pixelRatio: ERD_EXPORT_PIXEL_RATIO_REDUCED,
+      },
+    );
+
+    expect(options.pixelRatio).toBe(ERD_EXPORT_PIXEL_RATIO_REDUCED);
   });
 });
 
@@ -200,12 +245,16 @@ describe("estimateExportPageCount", () => {
 });
 
 describe("captureErdTiles", () => {
+  afterEach(() => {
+    vi.restoreAllMocks();
+    document.documentElement.removeAttribute("data-erd-export");
+  });
+
   it("passes width, height, and transform style to toPng", async () => {
     const htmlToImage = await import("html-to-image");
     const toPngSpy = vi
       .spyOn(htmlToImage, "toPng")
       .mockResolvedValue(`data:image/png;base64,${"x".repeat(ERD_EXPORT_MIN_DATA_URL_LENGTH)}`);
-    const { captureErdTiles } = await import("./erd-export");
 
     const viewportElement = document.createElement("div");
 
@@ -221,6 +270,7 @@ describe("captureErdTiles", () => {
         width: 400,
         height: 300,
         backgroundColor: "#ffffff",
+        cacheBust: true,
         style: expect.objectContaining({
           width: "400px",
           height: "300px",
@@ -229,7 +279,74 @@ describe("captureErdTiles", () => {
       }),
     );
 
-    toPngSpy.mockRestore();
+    expect(document.documentElement.hasAttribute("data-erd-export")).toBe(false);
+  });
+
+  it("reports progress after each tile capture", async () => {
+    const htmlToImage = await import("html-to-image");
+    vi.spyOn(htmlToImage, "toPng").mockResolvedValue(
+      `data:image/png;base64,${"x".repeat(ERD_EXPORT_MIN_DATA_URL_LENGTH)}`,
+    );
+
+    const viewportElement = document.createElement("div");
+    const progressCalls: Array<[number, number]> = [];
+
+    await captureErdTiles({
+      tiles: [
+        { x: 0, y: 0, width: 400, height: 300 },
+        { x: 400, y: 0, width: 400, height: 300 },
+      ],
+      viewportElement,
+      onProgress: (current, total) => {
+        progressCalls.push([current, total]);
+      },
+    });
+
+    expect(progressCalls).toEqual([[1, 2], [2, 2]]);
+  });
+
+  it("uses cacheBust only for the first tile", async () => {
+    const htmlToImage = await import("html-to-image");
+    const toPngSpy = vi
+      .spyOn(htmlToImage, "toPng")
+      .mockResolvedValue(`data:image/png;base64,${"x".repeat(ERD_EXPORT_MIN_DATA_URL_LENGTH)}`);
+
+    const viewportElement = document.createElement("div");
+
+    await captureErdTiles({
+      tiles: [
+        { x: 0, y: 0, width: 400, height: 300 },
+        { x: 400, y: 0, width: 400, height: 300 },
+      ],
+      viewportElement,
+    });
+
+    expect(toPngSpy.mock.calls[0]?.[1]).toMatchObject({ cacheBust: true });
+    expect(toPngSpy.mock.calls[1]?.[1]).toMatchObject({ cacheBust: false });
+  });
+
+  it("stops when the abort signal is triggered", async () => {
+    const htmlToImage = await import("html-to-image");
+    const abortController = new AbortController();
+    const toPngSpy = vi.spyOn(htmlToImage, "toPng").mockImplementation(async () => {
+      abortController.abort();
+      return `data:image/png;base64,${"x".repeat(ERD_EXPORT_MIN_DATA_URL_LENGTH)}`;
+    });
+
+    const viewportElement = document.createElement("div");
+
+    await expect(
+      captureErdTiles({
+        tiles: [
+          { x: 0, y: 0, width: 400, height: 300 },
+          { x: 400, y: 0, width: 400, height: 300 },
+        ],
+        viewportElement,
+        signal: abortController.signal,
+      }),
+    ).rejects.toBeInstanceOf(ErdExportAbortedError);
+
+    expect(toPngSpy).toHaveBeenCalledTimes(1);
     expect(document.documentElement.hasAttribute("data-erd-export")).toBe(false);
   });
 });

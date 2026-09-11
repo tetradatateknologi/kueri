@@ -338,6 +338,7 @@ function ErdToolButton({
 
 type ErdExportContext = {
   canvasContainerRef: MutableRefObject<HTMLDivElement | null>;
+  cancelExportRef: MutableRefObject<(() => void) | null>;
   projectName: string;
   env: WorkspaceEnv;
   userSlug: string;
@@ -392,6 +393,7 @@ function ErdToolbar({
           nodes={erd.nodes}
           visibleTableCount={erd.visibleTables.length}
           canvasContainerRef={exportContext.canvasContainerRef}
+          cancelExportRef={exportContext.cancelExportRef}
           projectName={exportContext.projectName}
           env={exportContext.env}
           userSlug={exportContext.userSlug}
@@ -556,12 +558,14 @@ function ErdFlowCanvas({
   fitViewRef,
   canvasContainerRef,
   exportProgress,
+  onCancelExport,
   syncViewport = false,
 }: {
   erd: ErdCanvasState;
   fitViewRef: MutableRefObject<FitViewFn | null>;
   canvasContainerRef: MutableRefObject<HTMLDivElement | null>;
   exportProgress: { current: number; total: number } | null;
+  onCancelExport?: () => void;
   syncViewport?: boolean;
 }) {
   const { fitView } = useReactFlow();
@@ -668,9 +672,20 @@ function ErdFlowCanvas({
           )}
           {exportProgress && (
             <div className="absolute inset-0 z-20 flex items-center justify-center bg-background/70 backdrop-blur-[1px]">
-              <div className="flex items-center gap-2 rounded-md border border-border/60 bg-surface-1 px-3 py-2 text-xs text-muted-foreground">
-                <Loader2 className="size-4 animate-spin text-electric" />
-                Exporting page {exportProgress.current} of {exportProgress.total}…
+              <div className="flex flex-col items-center gap-2 rounded-md border border-border/60 bg-surface-1 px-3 py-2 text-xs text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="size-4 animate-spin text-electric" />
+                  Exporting page {exportProgress.current} of {exportProgress.total}…
+                </div>
+                {onCancelExport && (
+                  <button
+                    type="button"
+                    onClick={onCancelExport}
+                    className="rounded px-2 py-1 text-[11px] text-foreground hover:bg-surface-2"
+                  >
+                    Cancel
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -709,6 +724,7 @@ function ErdPanelLayout({
           fitViewRef={fitViewRef}
           canvasContainerRef={exportContext.canvasContainerRef}
           exportProgress={exportProgress}
+          onCancelExport={() => exportContext.cancelExportRef.current?.()}
         />
       </div>
     );
@@ -747,6 +763,7 @@ function ErdPanelLayout({
             fitViewRef={fitViewRef}
             canvasContainerRef={exportContext.canvasContainerRef}
             exportProgress={exportProgress}
+            onCancelExport={() => exportContext.cancelExportRef.current?.()}
             syncViewport={syncViewport}
           />
         </div>
@@ -764,6 +781,7 @@ function ErdPanelInner({
 }) {
   const fitViewRef = useRef<FitViewFn | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const cancelExportRef = useRef<(() => void) | null>(null);
   const erd = useErdCanvas(connectionId, fitViewRef);
   const [fullscreenOpen, setFullscreenOpen] = useState(false);
   const [fullscreenFlowReady, setFullscreenFlowReady] = useState(false);
@@ -778,6 +796,7 @@ function ErdPanelInner({
   const exportContext = useMemo(
     () => ({
       canvasContainerRef,
+      cancelExportRef,
       projectName,
       env,
       userSlug,

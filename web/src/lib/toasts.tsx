@@ -54,3 +54,7 @@ export function showValidationError(message: string) {
 export function showSuccess(message: string) {
   showCustomToast((onDismiss) => <SuccessToast message={message} onDismiss={onDismiss} />);
 }
+
+export function showExportCancelledToast() {
+  showSuccess("Export cancelled");
+}
