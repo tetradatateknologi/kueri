@@ -99,6 +99,8 @@ export function buildErdGraph(
     id: table.id,
     type: "erdTable",
     position: { x: 0, y: 0 },
+    width: ERD_NODE_WIDTH,
+    height: estimateTableNodeHeight(table),
     draggable: false,
     data: {
       table,

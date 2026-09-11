@@ -185,6 +185,10 @@
   }
 }
 
+html[data-erd-export] .react-flow svg {
+  overflow: visible;
+}
+
 @utility glow-electric {
   box-shadow: 0 0 0 1px color-mix(in oklab, var(--electric) 40%, transparent),
               0 0 24px -4px color-mix(in oklab, var(--electric) 50%, transparent);

@@ -1,5 +1,5 @@
 import { useState, type MutableRefObject } from "react";
-import { getNodesBounds, useReactFlow, type Node } from "@xyflow/react";
+import type { Node } from "@xyflow/react";
 import { Download, FileImage, FileText, Loader2 } from "lucide-react";
 
 import {
@@ -28,6 +28,8 @@ import {
   ERD_EXPORT_WARN_TABLES,
   estimateExportPageCount,
   exportErdDiagram,
+  getErdExportBackgroundColor,
+  resolveErdNodesBounds,
 } from "@/lib/erd-export";
 import { downloadBlob, formatErdExportFilename } from "@/lib/export-utils";
 import type { ErdTableNodeData } from "@/lib/schema-erd";
@@ -61,7 +63,6 @@ export function ErdExportMenu({
   disabled,
   onExportProgress,
 }: ErdExportMenuProps) {
-  const { getViewport, setViewport } = useReactFlow();
   const [exporting, setExporting] = useState(false);
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [pendingFormat, setPendingFormat] = useState<"png" | "pdf" | null>(null);
@@ -80,7 +81,7 @@ export function ErdExportMenu({
       return;
     }
 
-    const bounds = getNodesBounds(nodes);
+    const bounds = resolveErdNodesBounds(nodes);
     const pageCount = estimateExportPageCount(bounds);
     if (pageCount > ERD_EXPORT_MAX_PAGES) {
       showValidationError(
@@ -101,12 +102,10 @@ export function ErdExportMenu({
     try {
       const result = await exportErdDiagram({
         nodes,
-        bounds,
         viewportElement,
-        getViewport,
-        setViewport,
         baseName,
         format,
+        backgroundColor: getErdExportBackgroundColor(),
         onProgress: (current, total) => onExportProgress({ current, total }),
       });
 
