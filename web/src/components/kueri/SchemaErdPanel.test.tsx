@@ -77,6 +77,16 @@ vi.mock("@/lib/api/erd", () => ({
   fetchConnectionErd: vi.fn(),
 }));
 
+vi.mock("@/context/kueri-app", () => ({
+  useKueriApp: () => ({
+    me: { email: "tester@example.com" },
+  }),
+}));
+
+vi.mock("@/components/kueri/ErdExportMenu", () => ({
+  ErdExportMenu: () => null,
+}));
+
 import { fetchConnectionErd } from "@/lib/api/erd";
 
 function renderPanel(connectionId: number | null = 1) {

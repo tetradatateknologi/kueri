@@ -53,12 +53,33 @@ export function resultToCsv(result: QueryResult): string {
   return lines.join("\n");
 }
 
-export function downloadCsv(filename: string, csv: string) {
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+export function downloadBlob(filename: string, blob: Blob) {
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename.endsWith(".csv") ? filename : `${filename}.csv`;
+  a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+export function downloadCsv(filename: string, csv: string) {
+  downloadBlob(
+    filename.endsWith(".csv") ? filename : `${filename}.csv`,
+    new Blob([csv], { type: "text/csv;charset=utf-8" }),
+  );
+}
+
+export function formatErdExportFilename(ctx: {
+  project: string;
+  env: WorkspaceEnv;
+  user: string;
+  date?: Date;
+}): string {
+  return formatExportFilename("{{project}}_erd_{{env}}_{{date}}", {
+    project: ctx.project,
+    env: ctx.env,
+    table: "erd",
+    user: ctx.user,
+    date: ctx.date,
+  });
 }

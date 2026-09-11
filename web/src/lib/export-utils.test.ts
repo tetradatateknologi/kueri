@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { envToApiEnv, formatExportFilename, inferTableName, resultToCsv } from "./export-utils";
+import {
+  envToApiEnv,
+  formatErdExportFilename,
+  formatExportFilename,
+  inferTableName,
+  resultToCsv,
+} from "./export-utils";
 import type { QueryResult } from "@/lib/api/types";
 
 describe("formatExportFilename", () => {
@@ -31,6 +37,18 @@ describe("inferTableName", () => {
 
   it("falls back to results", () => {
     expect(inferTableName("SELECT 1")).toBe("results");
+  });
+});
+
+describe("formatErdExportFilename", () => {
+  it("builds a stable ERD export name", () => {
+    const name = formatErdExportFilename({
+      project: "ecommerce",
+      env: "Production",
+      user: "alex.dev",
+      date: new Date("2026-06-04"),
+    });
+    expect(name).toBe("ecommerce_erd_production_2026-06-04");
   });
 });
 
